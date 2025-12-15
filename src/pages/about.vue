@@ -1,9 +1,11 @@
 <template>
     <div class="container">
         about page
-        <div class="nested">Nested Less Style</div>
+        <div class="nested">
+            Nested Less Style
+        </div>
         <p>{{ message }}</p>
-        <el-button >Default999</el-button>
+        <el-button>Default999</el-button>
     </div>
 </template>
 

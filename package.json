@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "NODE_ENV=production webpack --config webpack.config.js",
-    "start": "webpack serve --config webpack.config.js --open"
+    "start": "webpack serve --config webpack.config.js --open",
+    "lint": "eslint . --ext .vue,.js,.ts",
+    "lint:fix": "eslint . --ext .vue,.js,.ts --fix"
   },
   "keywords": [],
   "author": "",
@@ -15,8 +17,12 @@
     "@types/node": "^25.0.2",
     "@types/webpack": "^5.28.5",
     "@types/webpack-env": "^1.18.8",
+    "@typescript-eslint/eslint-plugin": "^8.49.0",
+    "@typescript-eslint/parser": "^8.49.0",
     "@vue/compiler-sfc": "^3.5.25",
     "css-loader": "^7.1.2",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
     "html-webpack-plugin": "^5.6.5",
     "less": "^4.5.1",
     "less-loader": "^12.3.0",
