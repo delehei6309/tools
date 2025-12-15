@@ -4,6 +4,11 @@ import HtmlWebpackPlugin from 'html-webpack-plugin';
 import { VueLoaderPlugin } from 'vue-loader';
 import fs from 'fs';
 
+// element ui 自动导入插件
+import AutoImport from 'unplugin-auto-import/webpack';
+import Components from 'unplugin-vue-components/webpack';
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -11,14 +16,13 @@ const __dirname = path.dirname(__filename);
 const entries = {};
 const htmlPlugins = [];
 const pagesDir = path.resolve(__dirname, 'src/pages');
-// 将临时目录移到 src 下，避免 node_modules 的潜在问题，也方便调试
-const tempEntriesDir = path.resolve(__dirname, 'src/.temp-entries');
+// 临时入口目录（不放在 `src` 下，避免触发文件监听循环）
+const tempEntriesDir = path.resolve(__dirname, '.temp-entries');
 
 // 确保临时目录存在
 if (!fs.existsSync(tempEntriesDir)) {
   fs.mkdirSync(tempEntriesDir, { recursive: true });
 }
-
 if (fs.existsSync(pagesDir)) {
   const pageFiles = fs.readdirSync(pagesDir).filter(file => file.endsWith('.vue'));
   pageFiles.forEach(file => {
@@ -26,18 +30,25 @@ if (fs.existsSync(pagesDir)) {
     const entryPath = path.join(tempEntriesDir, `${name}.js`);
     
     // 自动生成入口文件内容
-    const content = `import { createApp } from 'vue';
-        import App from '@/pages/${file}';
-        import '@/style/global.css'; // 尝试引入一个全局样式（如果存在），或者只是为了确保 css loader 工作
-        createApp(App).mount('#app');
-    `;
-    // 简化内容，去掉不必要的引用
-    const simpleContent = `import { createApp } from 'vue';
-        import App from '@/pages/${file}';
-        createApp(App).mount('#app');
-    `;
-    
-    fs.writeFileSync(entryPath, content);
+	// 开发环境下，全局引入 Element Plus，避免重复打包
+    const content = `
+		import { createApp } from 'vue';
+		import ElementPlus from 'element-plus'
+		import 'element-plus/dist/index.css'
+		import App from '@/pages/${file}';
+		createApp(App).use(ElementPlus).mount('#app');
+	`;
+    const buildContent = `
+		import { createApp } from 'vue';
+		import App from '@/pages/${file}';
+		createApp(App).mount('#app');
+	`;
+
+	const mainContent = process.env.NODE_ENV === 'production' ? buildContent : content;
+    // 只在文件不存在或内容变化时才写入，避免触发无谓的文件监听
+    if (!fs.existsSync(entryPath) || fs.readFileSync(entryPath, 'utf-8') !== mainContent) {
+      fs.writeFileSync(entryPath, mainContent);
+    }
 
     entries[name] = entryPath;
     
@@ -48,19 +59,84 @@ if (fs.existsSync(pagesDir)) {
       title: `${name} - Vue 3 App`
     }));
   });
-}export default {
-  mode: 'development', // 设置为开发模式 执行 npm run build 会自动切换为 production 模式
+}
+
+function setPlugins() {
+	return process.env.NODE_ENV === 'production' ? [
+		AutoImport({
+			resolvers: [ElementPlusResolver()],
+		}),
+		Components({
+			resolvers: [ElementPlusResolver()],
+		}),
+	] : []
+}
+export default {
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+  // 忽略自动生成的类型/临时文件，避免触发 rebuild 循环
+  watchOptions: {
+    ignored: [
+      '**/node_modules',
+      path.resolve(__dirname, 'auto-imports.d.ts'),
+      path.resolve(__dirname, 'components.d.ts'),
+      path.resolve(__dirname, '.temp-entries/**')
+    ],
+  },
   entry: entries,
   output: {
-    filename: '[name].js',
+    filename: '[name].[contenthash:8].js',
     path: path.resolve(__dirname, 'dist'),
     clean: true
+  },
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        // 提取 Vue 相关库
+        vue: {
+          test: /[\\/]node_modules[\\/](vue|@vue)[\\/]/,
+          name: 'vue-vendor',
+          priority: 20,
+        },
+        // 提取 Element Plus
+        elementPlus: {
+          test: /[\\/]node_modules[\\/]element-plus[\\/]/,
+          name: 'element-plus',
+          priority: 15,
+        },
+        // 提取其他第三方库
+        vendors: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          priority: 10,
+        },
+        // 提取公共代码（至少被2个页面引用）
+        common: {
+          minChunks: 2,
+          name: 'common',
+          priority: 5,
+          reuseExistingChunk: true,
+        },
+      },
+    },
+    runtimeChunk: {
+      name: 'runtime',
+    },
   },
   module: {
     rules: [
       {
         test: /\.vue$/,
         loader: 'vue-loader'
+      },
+      {
+        test: /\.ts$/,
+        loader: 'ts-loader',
+        options: {
+          appendTsSuffixTo: [/\.vue$/], // 让 ts-loader 处理 .vue 文件中的 TypeScript
+          transpileOnly: true, // 只进行转译，不进行类型检查，提高构建速度
+        },
+        exclude: /node_modules/
       },
       {
         test: /\.css$/,
@@ -80,23 +156,34 @@ if (fs.existsSync(pagesDir)) {
     ]
   },
   resolve: { // 代表模块解析配置
-    extensions: ['.js', '.vue', '.json'],
+    extensions: ['.ts', '.js', '.vue', '.json'],
     alias: {
       '@': path.resolve(__dirname, 'src')
     }
   },
   plugins: [ // 插件配置
+    ...setPlugins(),
     ...htmlPlugins,
-    new VueLoaderPlugin() // Vue Loader 插件 用于处理 .vue 文件
+    new VueLoaderPlugin(), // Vue Loader 插件 用于处理 .vue 文件
   ],
   devServer: {
     static: {
       directory: path.join(__dirname, 'public'),
     },
-    compress: true,
+    // compress: true,
     port: 3000,
-    hot: true,
-    open: true
+    hot: false,
+    open: true,
+    // 额外忽略 watch，防止插件生成 d.ts 时触发重载
+    watchFiles: {
+      paths: ['src/**/*'],
+      options: {
+        ignored: [
+          '**/*.d.ts',
+          path.resolve(__dirname, '.temp-entries')
+        ]
+      }
+    }
   }
 };
 
