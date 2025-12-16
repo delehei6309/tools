@@ -36,7 +36,7 @@
             </el-form-item>
             <!-- 二维码风格 -->
             <el-form-item label="二维码风格" prop="style" size="default">
-                <div style="display: flex; gap: 20px;">
+                <div style="display: flex; gap: 16px;flex-wrap: wrap;">
                     <span>
                         码颜色：<el-color-picker v-model="codeColor" />
                     </span>
@@ -45,6 +45,9 @@
                     </span>
                 </div>
             </el-form-item>
+            <el-form-item label="二维码尺寸" size="default">
+                <el-input-number v-model="size" :min="80" :max="400"  step="10" :step-strictly="true"/>
+            </el-form-item>
             <el-form-item>
                 <el-button type="primary" @click="onSubmit">生成二维码</el-button>
                 <el-button @click="onReset">重置参数</el-button>
@@ -52,7 +55,7 @@
         </el-form>
         <div class="qrcode-container" v-show="!!qrCodeDataUrl">
             <el-text type="warning" line-clamp="100" style="word-break: break-word;">{{qrCodeUrl}}</el-text>
-            <img :src="qrCodeDataUrl" alt="">
+            <img :src="qrCodeDataUrl" alt="QR Code"/>
             <el-link type="primary" underline="never" download="qrcode.png" :href="qrCodeDataUrl">保存到本地</el-link>
         </div>
     </el-card>
@@ -106,6 +109,7 @@
     // 码颜色
     const codeColor = ref('#000000');
     const backgroundColor = ref('#FFFFFF');
+    const size = ref(180);
     const form = reactive<{
         origin: string;
         custom: string;
@@ -154,7 +158,7 @@
             qrCodeUrl.value = url.toString();
             QRCode.toDataURL(qrCodeUrl.value, {
                 // errorCorrectionLevel: "H",
-                width: 180,
+                width: size.value,
                 margin: 1,
                 color: {
                     // 给我个好看的搭配颜色
@@ -174,6 +178,7 @@
         form.paramsInput = [];
         codeColor.value = '#000000';
         backgroundColor.value = '#FFFFFF';
+        size.value = 180;
         formRef.value?.resetFields();
     };
 
@@ -225,8 +230,8 @@
         gap: 6px;
         text-align: center;
         img{
-            width: 180px;
-            height: 180px;
+            width: auto;
+            height: auto;
         }
     }
 </style>
