@@ -51,7 +51,7 @@
             </el-form-item>
         </el-form>
         <div class="qrcode-container" v-show="!!qrCodeDataUrl">
-            <el-text class="mx-1" type="warning">{{qrCodeUrl}}</el-text>
+            <el-text type="warning" line-clamp="100" style="word-break: break-word;">{{qrCodeUrl}}</el-text>
             <img :src="qrCodeDataUrl" alt="">
             <el-link type="primary" underline="never" download="qrcode.png" :href="qrCodeDataUrl">保存到本地</el-link>
         </div>
@@ -63,7 +63,7 @@
 
 <script lang="ts" setup>
     import { reactive, ref } from "vue";
-    import type { FormInstance } from 'element-plus';
+    import type { FormInstance, CheckboxValueType } from 'element-plus';
     import { Plus } from '@element-plus/icons-vue';
     import QRCode from "qrcode";
     import CreateParam from '@/components/create-param/index.vue';
@@ -109,7 +109,7 @@
     const form = reactive<{
         origin: string;
         custom: string;
-        params: string[];
+        params: (string | number)[];
         paramsInput: ParamsInput[];
     }>({
         origin: "",
@@ -126,14 +126,15 @@
             { required: true, message: '请输入自定义网址', trigger: 'blur' }
         ],
     }
-    const checkboxChange = (val: string[]) => {
+    const checkboxChange = (val: CheckboxValueType[]) => {
         form.paramsInput = val.map((v) => {
-            const item = paramOptions.find((option) => option.value === v);
-            const oldValue = form.paramsInput.find((input) => input.key === v);
+            const key = String(v);
+            const item = paramOptions.find((option) => option.value === key);
+            const oldValue = form.paramsInput.find((input) => input.key === key);
             return {
                 value: oldValue ? oldValue.value : "",
                 label: item ? item.label : "",
-                key: v,
+                key,
             };
         });
         
@@ -145,9 +146,11 @@
             await formRef.value?.validate();
             const url = new URL(form.origin === 'custom' ? form.custom : form.origin);
             form.paramsInput.forEach((input) => {
-                url.searchParams.append(input.key, input.value);
+                // input.value maybe empty
+                if (input.value) {
+                    url.searchParams.append(input.key, input.value);
+                }
             });
-            console.log('Generated URL:', url.toString());
             qrCodeUrl.value = url.toString();
             QRCode.toDataURL(qrCodeUrl.value, {
                 // errorCorrectionLevel: "H",
@@ -159,7 +162,6 @@
                     light: backgroundColor.value
                 }
             }, (err, dataUrl) => {
-                console.log(dataUrl)
                 // 清空容器 并且添加新的canvas
                 qrCodeDataUrl.value = dataUrl;
             })
@@ -221,6 +223,7 @@
         flex-direction: column;
         align-items: center;
         gap: 6px;
+        text-align: center;
         img{
             width: 180px;
             height: 180px;
