@@ -2,6 +2,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import { VueLoaderPlugin } from 'vue-loader';
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
+import CssMinimizerPlugin from 'css-minimizer-webpack-plugin';
+import TerserPlugin from 'terser-webpack-plugin';
 import fs from 'fs';
 
 // element ui 自动导入插件
@@ -11,6 +14,8 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 // 读取页面标题配置
 let pageTitleConfig = {};
@@ -53,7 +58,7 @@ if (fs.existsSync(pagesDir)) {
 		createApp(App).mount('#app');
 	`;
 
-	const mainContent = process.env.NODE_ENV === 'production' ? buildContent : content;
+	const mainContent = isProduction ? buildContent : content;
     // 只在文件不存在或内容变化时才写入，避免触发无谓的文件监听
     if (!fs.existsSync(entryPath) || fs.readFileSync(entryPath, 'utf-8') !== mainContent) {
       fs.writeFileSync(entryPath, mainContent);
@@ -74,7 +79,7 @@ if (fs.existsSync(pagesDir)) {
 }
 
 function setPlugins() {
-	return process.env.NODE_ENV === 'production' ? [
+	return isProduction ? [
 		AutoImport({
 			resolvers: [ElementPlusResolver()],
 		}),
@@ -84,7 +89,7 @@ function setPlugins() {
 	] : []
 }
 export default {
-  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+  mode: isProduction ? 'production' : 'development',
   // 性能提示配置
   performance: {
     // hints: process.env.NODE_ENV === 'production' ? 'warning' : false,
@@ -107,6 +112,17 @@ export default {
     clean: true
   },
   optimization: {
+    minimizer: [
+      new TerserPlugin({
+        extractComments: false, // 不生成 LICENSE.txt 文件
+        terserOptions: {
+          compress: {
+            drop_console: isProduction, // 生产环境移除 console
+          },
+        },
+      }),
+      new CssMinimizerPlugin(), // CSS 压缩
+    ],
     splitChunks: {
       chunks: 'all',
       cacheGroups: {
@@ -135,6 +151,13 @@ export default {
           priority: 5,
           reuseExistingChunk: true,
         },
+        // 提取所有 CSS 到单独文件
+        styles: {
+          name: 'styles',
+          type: 'css/mini-extract',
+          chunks: 'all',
+          enforce: true,
+        },
       },
     },
     runtimeChunk: {
@@ -159,14 +182,14 @@ export default {
       {
         test: /\.css$/,
         use: [
-          'style-loader',
+          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
           'css-loader'
         ]
       },
       {
         test: /\.less$/,
         use: [
-          'style-loader',
+          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
           'css-loader',
           'less-loader'
         ]
@@ -183,6 +206,13 @@ export default {
     ...setPlugins(),
     ...htmlPlugins,
     new VueLoaderPlugin(), // Vue Loader 插件 用于处理 .vue 文件
+    // 生产环境提取 CSS
+    ...(isProduction ? [
+      new MiniCssExtractPlugin({
+        filename: '[name].[contenthash:8].css',
+        chunkFilename: '[id].[contenthash:8].css',
+      })
+    ] : []),
   ],
   devServer: {
     static: {
