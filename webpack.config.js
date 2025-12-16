@@ -12,6 +12,15 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// 读取页面标题配置
+let pageTitleConfig = {};
+try {
+  const configModule = await import('./src/config/page-title.js');
+  pageTitleConfig = configModule.default || {};
+} catch (error) {
+  console.warn('页面标题配置文件不存在，将使用默认标题');
+}
+
 // 动态获取 entries 和 htmlPlugins
 const entries = {};
 const htmlPlugins = [];
@@ -51,12 +60,15 @@ if (fs.existsSync(pagesDir)) {
     }
 
     entries[name] = entryPath;
+
+	// 使用配置的标题，如果没有配置则使用页面名称
+	const pageTitle = pageTitleConfig[name] || name;
     
     htmlPlugins.push(new HtmlWebpackPlugin({
       template: './public/index.html',
       filename: `${name}.html`,
       chunks: [name],
-      title: `${name} - Vue 3 App`
+      title: pageTitle
     }));
   });
 }
@@ -73,6 +85,12 @@ function setPlugins() {
 }
 export default {
   mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+  // 性能提示配置
+  performance: {
+    // hints: process.env.NODE_ENV === 'production' ? 'warning' : false,
+    maxEntrypointSize: 512000, // 入口点最大体积 500KB
+    maxAssetSize: 512000, // 单个资源最大体积 500KB
+  },
   // 忽略自动生成的类型/临时文件，避免触发 rebuild 循环
   watchOptions: {
     ignored: [
@@ -174,6 +192,19 @@ export default {
     port: 3000,
     hot: false,
     open: true,
+    client: {
+      overlay: {
+        errors: true,
+        warnings: false,
+        runtimeErrors: (error) => {
+          // 忽略 ResizeObserver 循环错误（Element Plus 等 UI 库常见问题）
+          if (error.message.includes('ResizeObserver loop')) {
+            return false;
+          }
+          return true;
+        },
+      },
+    },
     // 额外忽略 watch，防止插件生成 d.ts 时触发重载
     watchFiles: {
       paths: ['src/**/*'],
