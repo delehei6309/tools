@@ -21,8 +21,8 @@ fi
 echo "Recording new files..."
 ls -A dist > .deployed-files
 
-# cp -r dist/* .
+cp -r dist/* .
 
-# git add .
-# git commit -m "deploy dist to gh-pages"
-# git push origin gh-pages
+git add .
+git commit -m "deploy dist to gh-pages"
+git push origin gh-pages
