@@ -14,7 +14,7 @@
             <el-alert :closable="false" type="info" style="margin-top: 16px">
               <template #title>
                 <div class="url-display">
-                  <el-text type="primary" truncated style="font-size: 12px">
+                  <el-text type="primary" style="font-size: 12px; line-height: 1.6">
                     {{ qrCodeUrl }}
                   </el-text>
                 </div>
@@ -105,6 +105,24 @@ defineProps<{
 .url-display {
   width: 100%;
   word-break: break-all;
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+  
+  /* 自定义滚动条样式 */
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #409eff;
+    border-radius: 2px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 2px;
+  }
 }
 
 .empty-state {

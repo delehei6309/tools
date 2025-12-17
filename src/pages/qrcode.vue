@@ -105,7 +105,7 @@ const paramOptions = reactive<ParamOption[]>([...DEFAULT_PARAM_OPTIONS]);
 
 // 表单数据
 const form = reactive<QRCodeForm>({
-  origin: 'custom',
+  origin: '',
   custom: '',
   params: [],
   paramsInput: [],

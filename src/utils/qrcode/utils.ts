@@ -55,6 +55,33 @@ export const addLogoToQRCode = (
 };
 
 /**
+ * 根据 URL 长度和 Logo 自动选择纠错级别
+ * @param url 二维码 URL
+ * @param hasLogo 是否有 Logo
+ * @returns 'L' | 'M' | 'Q' | 'H'
+ */
+const getErrorCorrectionLevel = (url: string, hasLogo: boolean): 'L' | 'M' | 'Q' | 'H' => {
+  const urlLength = url.length;
+
+  // 如果有 Logo，必须使用高纠错率
+  if (hasLogo) {
+    return 'H'; // 30% 纠错能力，适合叠加 Logo
+  }
+
+  // 根据 URL 长度选择纠错级别
+  // URL 越短，可以使用更高的纠错级别
+  if (urlLength < 50) {
+    return 'H'; // 30% 纠错
+  } else if (urlLength < 100) {
+    return 'Q'; // 25% 纠错
+  } else if (urlLength < 200) {
+    return 'M'; // 15% 纠错
+  } else {
+    return 'L'; // 7% 纠错，适合长 URL
+  }
+};
+
+/**
  * 生成二维码
  * @param options 二维码生成选项
  * @returns Promise<{ dataUrl: string; url: string }>
@@ -63,10 +90,13 @@ export const generateQRCode = async (
   options: QRCodeOptions
 ): Promise<{ dataUrl: string; url: string }> => {
   return new Promise((resolve, reject) => {
+    const hasLogo = Boolean(options.logoImage && options.logoSize);
+    const errorCorrectionLevel = getErrorCorrectionLevel(options.url, hasLogo);
+
     QRCode.toDataURL(
       options.url,
       {
-        errorCorrectionLevel: 'H', // 高容错率，支持 logo 遮挡
+        errorCorrectionLevel, // 自动选择纠错级别
         width: options.size,
         margin: 1,
         color: {
@@ -82,8 +112,12 @@ export const generateQRCode = async (
         }
 
         // 如果有 logo，叠加到二维码上
-        if (options.logoImage && options.logoSize) {
-          const finalDataUrl = await addLogoToQRCode(dataUrl, options.logoImage, options.logoSize);
+        if (hasLogo) {
+          const finalDataUrl = await addLogoToQRCode(
+            dataUrl,
+            options.logoImage!,
+            options.logoSize!
+          );
           resolve({ dataUrl: finalDataUrl, url: options.url });
         } else {
           resolve({ dataUrl, url: options.url });
