@@ -1,18 +1,4 @@
-div,
-p,
-dl,
-ol,
-ul,
-li,
-dt,
-dd,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  padding: 0;
+body{
   margin: 0;
-  box-sizing: border-box;
+  padding: 0;
 }
