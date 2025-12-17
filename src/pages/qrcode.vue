@@ -1,237 +1,284 @@
 <template>
-    <el-card style="max-width: 800px; margin: 30px auto" shadow="hover">
-        <template #header>
-            <div class="card-header">
-                <span>生成二维码</span>
-                <el-link type="primary" underline="always" href="https://cli.im/url" target="_blank">更多>></el-link>
-            </div>
-        </template>
-        <el-form :model="form" size="large" label-position="top" ref="formRef" :rules="rules">
-            <el-form-item label="网址" prop="origin">
-                <el-select v-model="form.origin" placeholder="请选择网址">
-                    <el-option
-                        v-for="item in originOptions"
-                        :key="item.value"
-                        :label="item.label"
-                        :value="item.value"
-                    /> 
-                </el-select>
-            </el-form-item>
-            <!-- 自定义网址 -->
-            <el-form-item v-if="form.origin === 'custom'" label="自定义网址" prop="custom">
-                <el-input v-model="form.custom" placeholder="请输入自定义网址" maxlength="100" :formatter="(value:string) => value.replace(/\s/g, '')" />
-            </el-form-item>
-            <!-- 参数选择 -->
-            <el-form-item label="URL参数" prop="params">
-                    <el-checkbox-group v-model="form.params" @change="checkboxChange" size="default" class="checkbox-group-box">
-                    <el-checkbox border v-for="option in paramOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                    </el-checkbox>
-                    <el-button type="success" circle size="default" :icon="Plus" @click="handleCreateParam"></el-button>
-                </el-checkbox-group>
-            </el-form-item>
-            <!-- 动态Input -->
-            <el-form-item v-for="(input) in form.paramsInput" :key="input.key" :label="input.label" :prop="input.key">
-                <el-input v-model="input.value" :placeholder="`请输入${input.label}`" :maxlength="100" :formatter="(value:string) => value.replace(/\s/g, '')" />
-            </el-form-item>
-            <!-- 二维码风格 -->
-            <el-form-item label="二维码风格" prop="style" size="default">
-                <div style="display: flex; gap: 16px;flex-wrap: wrap;">
-                    <span>
-                        码颜色：<el-color-picker v-model="codeColor" />
-                    </span>
-                    <span>
-                        背景色：<el-color-picker v-model="backgroundColor" />
-                    </span>
-                </div>
-            </el-form-item>
-            <el-form-item label="二维码尺寸" size="default">
-                <el-input-number v-model="size" :min="80" :max="400"  step="10" :step-strictly="true"/>
-            </el-form-item>
-            <el-form-item>
-                <el-button type="primary" @click="onSubmit">生成二维码</el-button>
-                <el-button @click="onReset">重置参数</el-button>
-            </el-form-item>
+  <div class="qrcode-page">
+    <div class="page-header">
+      <h1>二维码生成器</h1>
+      <el-link type="primary" underline="always" href="https://cli.im/url" target="_blank">
+        更多工具 &raquo;
+      </el-link>
+    </div>
+
+    <div class="content-wrapper">
+      <!-- 左侧表单区 -->
+      <el-card class="form-card" shadow="hover">
+        <el-form :model="form" label-position="top" ref="formRef" :rules="rules">
+          <!-- 基础信息表单 -->
+          <BaseInfoForm
+            :model-value="form"
+            @update:model-value="(val) => Object.assign(form, val)"
+            :origin-options="originOptions"
+            :param-options="paramOptions"
+            @create-param="handleCreateParam"
+          />
+
+          <!-- 样式配置 -->
+          <StyleConfig
+            v-model:size="styleConfig.size"
+            v-model:code-color="styleConfig.codeColor"
+            v-model:background-color="styleConfig.backgroundColor"
+          />
+
+          <!-- Logo 配置 -->
+          <LogoConfig
+            v-model:logo-image="logoConfig.image"
+            v-model:logo-size="logoConfig.size"
+            @remove-logo="handleRemoveLogo"
+          />
+
+          <!-- 操作按钮 -->
+          <el-form-item style="margin-top: 30px; margin-bottom: 0">
+            <el-button
+              type="primary"
+              size="large"
+              @click="onSubmit"
+              :icon="Check"
+              style="width: 48%"
+            >
+              生成
+            </el-button>
+            <el-button size="large" @click="onReset" :icon="RefreshLeft" style="width: 48%">
+              重置
+            </el-button>
+          </el-form-item>
         </el-form>
-        <div class="qrcode-container" v-show="!!qrCodeDataUrl">
-            <el-text type="warning" line-clamp="100" style="word-break: break-word;">{{qrCodeUrl}}</el-text>
-            <img :src="qrCodeDataUrl" alt="QR Code"/>
-            <el-link type="primary" underline="never" download="qrcode.png" :href="qrCodeDataUrl">保存到本地</el-link>
-        </div>
-    </el-card>
-    <CreateParam :visible="dialogFormVisible" 
-        @close="dialogFormVisible = false"
-        @submit="onParamCreate" />
+      </el-card>
+
+      <!-- 右侧预览区 -->
+      <QRCodePreview :qr-code-data-url="qrCodeDataUrl" :qr-code-url="qrCodeUrl" />
+    </div>
+  </div>
+
+  <!-- 创建参数对话框 -->
+  <CreateParam
+    :visible="dialogFormVisible"
+    @close="dialogFormVisible = false"
+    @submit="onParamCreate"
+  />
 </template>
 
 <script lang="ts" setup>
-    import { reactive, ref } from "vue";
-    import type { FormInstance, CheckboxValueType } from 'element-plus';
-    import { Plus } from '@element-plus/icons-vue';
-    import QRCode from "qrcode";
-    import CreateParam from '@/components/create-param/index.vue';
-    import { ElMessage } from 'element-plus'
-    const formRef = ref<FormInstance>()
-    const originOptions = [
-        { value: "https://c.sinbaad.com", label: "薪八达个人签约" },
-        { value: "https://test-c.sinbaad.com", label: "薪八达个人签约-测试环境" },
-        // 自定义
-        { value: "custom", label: "自定义" },
-    ];
-    const paramOptions = reactive([
-        {
-            label: "企业UUID",
-            value: "customer_user_uuid",
-        },
-        {
-            label: "供应商UUID",
-            value: "provider_user_uuid",
-        },{
-            label: "岗位UUID",
-            value: "position_uuid",
-        },{
-            label: "项目UUID",
-            value: "project_uuid",
-        },{
-            label: "proxy_uuid",
-            value: "proxy_uuid",
-        },{
-            label: "proxy_user_uuid",
-            value: "proxy_user_uuid"
-        }
-    ]);
-    // do not use same name with ref
-    interface ParamsInput {
-        value: string;
-        label: string;
-        key: string;
+import { reactive, ref } from 'vue';
+import type { FormInstance } from 'element-plus';
+import { ElMessage } from 'element-plus';
+import { Check, RefreshLeft } from '@element-plus/icons-vue';
+import '@/style/global.css';
+
+// 组件导入
+import BaseInfoForm from '@/components/qrcode/BaseInfoForm.vue';
+import StyleConfig from '@/components/qrcode/StyleConfig.vue';
+import LogoConfig from '@/components/qrcode/LogoConfig.vue';
+import QRCodePreview from '@/components/qrcode/QRCodePreview.vue';
+import CreateParam from '@/components/create-param/index.vue';
+
+// 类型和工具函数导入
+import type {
+  QRCodeForm,
+  ParamOption,
+  StyleConfig as StyleConfigType,
+  LogoConfig as LogoConfigType,
+} from '@/types/qrcode';
+import { generateQRCode, buildURL, isValidURL } from '@/utils/qrcode/utils';
+import {
+  ORIGIN_OPTIONS,
+  DEFAULT_PARAM_OPTIONS,
+  DEFAULT_STYLE_CONFIG,
+  DEFAULT_LOGO_CONFIG,
+} from '@/utils/qrcode/constants';
+
+// 表单引用
+const formRef = ref<FormInstance>();
+
+// 来源选项配置
+const originOptions = ORIGIN_OPTIONS;
+
+// 参数选项（使用 reactive 因为需要动态添加）
+const paramOptions = reactive<ParamOption[]>([...DEFAULT_PARAM_OPTIONS]);
+
+// 表单数据
+const form = reactive<QRCodeForm>({
+  origin: '',
+  custom: '',
+  params: [],
+  paramsInput: [],
+});
+
+// 样式配置
+const styleConfig = reactive<StyleConfigType>({ ...DEFAULT_STYLE_CONFIG });
+
+// Logo 配置
+const logoConfig = reactive<LogoConfigType>({ ...DEFAULT_LOGO_CONFIG });
+
+// 二维码结果
+const qrCodeDataUrl = ref('');
+const qrCodeUrl = ref('');
+
+// 对话框控制
+const dialogFormVisible = ref(false);
+
+// URL 校验规则
+const validateURL = (_rule: any, value: string, callback: any) => {
+  if (!value) {
+    callback(new Error('请输入自定义网址'));
+    return;
+  }
+  if (!isValidURL(value)) {
+    if (!value.startsWith('http://') && !value.startsWith('https://')) {
+      callback(new Error('网址必须以 http:// 或 https:// 开头'));
+    } else {
+      callback(new Error('请输入有效的网址格式'));
     }
-    // 码颜色
-    const codeColor = ref('#000000');
-    const backgroundColor = ref('#FFFFFF');
-    const size = ref(180);
-    const form = reactive<{
-        origin: string;
-        custom: string;
-        params: (string | number)[];
-        paramsInput: ParamsInput[];
-    }>({
-        origin: "",
-        custom: "",
-        params: [],
-        paramsInput: [],
+    return;
+  }
+  callback();
+};
+
+// 表单校验规则
+const rules = {
+  origin: [{ required: true, message: '请选择网址', trigger: 'change' }],
+  custom: [
+    { required: true, message: '请输入自定义网址', trigger: 'change' },
+    { validator: validateURL, trigger: 'change' },
+  ],
+};
+
+// 生成二维码
+const onSubmit = async () => {
+  try {
+    await formRef.value?.validate();
+
+    const baseUrl = form.origin === 'custom' ? form.custom : form.origin;
+    const url = buildURL(baseUrl, form.paramsInput);
+
+    const result = await generateQRCode({
+      url,
+      size: styleConfig.size,
+      codeColor: styleConfig.codeColor,
+      backgroundColor: styleConfig.backgroundColor,
+      logoImage: logoConfig.image,
+      logoSize: logoConfig.size,
     });
-    // 表单校验规则
-    const rules = {
-        origin: [
-            { required: true, message: '请选择网址', trigger: 'change' }
-        ],
-        custom: [
-            { required: true, message: '请输入自定义网址', trigger: 'blur' }
-        ],
-    }
-    const checkboxChange = (val: CheckboxValueType[]) => {
-        form.paramsInput = val.map((v) => {
-            const key = String(v);
-            const item = paramOptions.find((option) => option.value === key);
-            const oldValue = form.paramsInput.find((input) => input.key === key);
-            return {
-                value: oldValue ? oldValue.value : "",
-                label: item ? item.label : "",
-                key,
-            };
-        });
-        
-    };
-    const qrCodeDataUrl = ref('');
-    const qrCodeUrl = ref('');
-    const onSubmit = async () => {
-        try{
-            await formRef.value?.validate();
-            const url = new URL(form.origin === 'custom' ? form.custom : form.origin);
-            form.paramsInput.forEach((input) => {
-                // input.value maybe empty
-                if (input.value) {
-                    url.searchParams.append(input.key, input.value);
-                }
-            });
-            qrCodeUrl.value = url.toString();
-            QRCode.toDataURL(qrCodeUrl.value, {
-                // errorCorrectionLevel: "H",
-                width: size.value,
-                margin: 1,
-                color: {
-                    // 给我个好看的搭配颜色
-                    dark: codeColor.value,
-                    light: backgroundColor.value
-                }
-            }, (err, dataUrl) => {
-                // 清空容器 并且添加新的canvas
-                qrCodeDataUrl.value = dataUrl;
-            })
-        } catch (error) {
-            console.log('Validation failed', error);
-            return;
-        }
-    };
-    const onReset = () => {
-        form.paramsInput = [];
-        codeColor.value = '#000000';
-        backgroundColor.value = '#FFFFFF';
-        size.value = 180;
-        formRef.value?.resetFields();
-    };
 
+    qrCodeDataUrl.value = result.dataUrl;
+    qrCodeUrl.value = result.url;
+  } catch (error) {
+    console.log('Validation or generation failed', error);
+  }
+};
 
-    const dialogFormVisible = ref(false);
-    const handleCreateParam = () => {
-        dialogFormVisible.value = true;
-    };
+// 重置表单
+const onReset = () => {
+  form.paramsInput = [];
+  Object.assign(styleConfig, DEFAULT_STYLE_CONFIG);
+  Object.assign(logoConfig, DEFAULT_LOGO_CONFIG);
+  qrCodeDataUrl.value = '';
+  qrCodeUrl.value = '';
+  formRef.value?.resetFields();
+};
 
-    // 新增参数回调
-    const onParamCreate = (value: { label: string; value: string }) => {
-        // 去重
-        const exists = paramOptions.find((option) => option.value === value.value);
-        if (exists) {
-            // element-plus 提示
-            ElMessage.warning('参数已存在');
-            return;
-        }
-        paramOptions.push({
-            label: value.label,
-            value: value.value,
-        });
-    };
+// 打开创建参数对话框
+const handleCreateParam = () => {
+  dialogFormVisible.value = true;
+};
+
+// 删除 Logo
+const handleRemoveLogo = () => {
+  logoConfig.image = '';
+};
+
+// 新增参数回调
+const onParamCreate = (value: { label: string; value: string }) => {
+  const exists = paramOptions.find((option) => option.value === value.value);
+  if (exists) {
+    ElMessage.warning('参数已存在');
+    return;
+  }
+  paramOptions.push({
+    label: value.label,
+    value: value.value,
+  });
+};
 </script>
 
 <style scoped lang="less">
-    .card-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+.qrcode-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 20px;
+}
+
+.page-header {
+  max-width: 1400px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: #303133;
+  }
+}
+
+.content-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 20px;
+  align-items: start;
+}
+
+.form-card {
+  border-radius: 12px;
+
+  :deep(.el-card__body) {
+    padding: 24px;
+  }
+}
+
+// 分隔线统一样式
+:deep(.el-divider) {
+  margin: 24px 0 20px;
+
+  .el-divider__text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    color: #606266;
+    background-color: #fff;
+  }
+}
+
+// 响应式
+@media (max-width: 1200px) {
+  .content-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .qrcode-page {
+    padding: 10px;
+  }
+
+  .page-header {
+    h1 {
+      font-size: 22px;
     }
-    .checkbox-group-box{
-        display: flex;
-        flex-wrap: wrap;
-        gap: 15px;
-        .el-checkbox{
-            margin-right: 0;
-        }
-    }
-    .qrcode-container{
-        margin-top: 20px;
-        border: 1px solid #eee;
-        padding:6px;
-        border-radius: 2px;
-        font-size: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 6px;
-        text-align: center;
-        img{
-            width: auto;
-            height: auto;
-        }
-    }
+  }
+}
 </style>
