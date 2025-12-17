@@ -1,1 +1,10 @@
+#!/bin/sh
+
+# 跳过 gh-pages 分支的格式检查
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+if [ "$branch" = "gh-pages" ]; then
+  echo "⏭️  跳过 gh-pages 分支的格式检查"
+  exit 0
+fi
+
 npx lint-staged
