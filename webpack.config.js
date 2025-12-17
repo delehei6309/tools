@@ -5,6 +5,7 @@ import { VueLoaderPlugin } from 'vue-loader';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 import CssMinimizerPlugin from 'css-minimizer-webpack-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
+// import CompressionPlugin from 'compression-webpack-plugin';
 import fs from 'fs';
 
 // element ui 自动导入插件
@@ -38,13 +39,13 @@ if (!fs.existsSync(tempEntriesDir)) {
   fs.mkdirSync(tempEntriesDir, { recursive: true });
 }
 if (fs.existsSync(pagesDir)) {
-  const pageFiles = fs.readdirSync(pagesDir).filter(file => file.endsWith('.vue'));
-  pageFiles.forEach(file => {
+  const pageFiles = fs.readdirSync(pagesDir).filter((file) => file.endsWith('.vue'));
+  pageFiles.forEach((file) => {
     const name = file.replace('.vue', '');
     const entryPath = path.join(tempEntriesDir, `${name}.js`);
-    
+
     // 自动生成入口文件内容
-	// 开发环境下，全局引入 Element Plus，避免重复打包
+    // 开发环境下，全局引入 Element Plus，避免重复打包
     const content = `
 		import { createApp } from 'vue';
 		import ElementPlus from 'element-plus'
@@ -58,7 +59,7 @@ if (fs.existsSync(pagesDir)) {
 		createApp(App).mount('#app');
 	`;
 
-	const mainContent = isProduction ? buildContent : content;
+    const mainContent = isProduction ? buildContent : content;
     // 只在文件不存在或内容变化时才写入，避免触发无谓的文件监听
     if (!fs.existsSync(entryPath) || fs.readFileSync(entryPath, 'utf-8') !== mainContent) {
       fs.writeFileSync(entryPath, mainContent);
@@ -66,34 +67,38 @@ if (fs.existsSync(pagesDir)) {
 
     entries[name] = entryPath;
 
-	// 使用配置的标题，如果没有配置则使用页面名称
-	const pageTitle = pageTitleConfig[name] || name;
-    
-    htmlPlugins.push(new HtmlWebpackPlugin({
-      template: './public/index.html',
-      filename: `${name}.html`,
-      chunks: [name],
-      title: pageTitle
-    }));
+    // 使用配置的标题，如果没有配置则使用页面名称
+    const pageTitle = pageTitleConfig[name] || name;
+
+    htmlPlugins.push(
+      new HtmlWebpackPlugin({
+        template: './public/index.html',
+        filename: `${name}.html`,
+        chunks: [name],
+        title: pageTitle,
+      })
+    );
   });
 }
 
 function setPlugins() {
-	return isProduction ? [
-		AutoImport({
-			resolvers: [ElementPlusResolver()],
-		}),
-		Components({
-			resolvers: [ElementPlusResolver()],
-		}),
-	] : []
+  return isProduction
+    ? [
+        AutoImport({
+          resolvers: [ElementPlusResolver()],
+        }),
+        Components({
+          resolvers: [ElementPlusResolver()],
+        }),
+      ]
+    : [];
 }
 export default {
   mode: isProduction ? 'production' : 'development',
   // 性能提示配置
   performance: {
     // hints: process.env.NODE_ENV === 'production' ? 'warning' : false,
-    maxEntrypointSize: 512000, // 入口点最大体积 500KB
+    maxEntrypointSize: 600000, // 入口点最大体积 600KB
     maxAssetSize: 512000, // 单个资源最大体积 500KB
   },
   // 忽略自动生成的类型/临时文件，避免触发 rebuild 循环
@@ -102,14 +107,14 @@ export default {
       '**/node_modules',
       path.resolve(__dirname, 'auto-imports.d.ts'),
       path.resolve(__dirname, 'components.d.ts'),
-      path.resolve(__dirname, '.temp-entries/**')
+      path.resolve(__dirname, '.temp-entries/**'),
     ],
   },
   entry: entries,
   output: {
     filename: '[name].[contenthash:8].js',
     path: path.resolve(__dirname, 'dist'),
-    clean: true
+    clean: true,
   },
   optimization: {
     minimizer: [
@@ -168,7 +173,7 @@ export default {
     rules: [
       {
         test: /\.vue$/,
-        loader: 'vue-loader'
+        loader: 'vue-loader',
       },
       {
         test: /\.ts$/,
@@ -177,48 +182,59 @@ export default {
           appendTsSuffixTo: [/\.vue$/], // 让 ts-loader 处理 .vue 文件中的 TypeScript
           transpileOnly: true, // 只进行转译，不进行类型检查，提高构建速度
         },
-        exclude: /node_modules/
+        exclude: /node_modules/,
       },
       {
         test: /\.css$/,
-        use: [
-          isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
-          'css-loader'
-        ]
+        use: [isProduction ? MiniCssExtractPlugin.loader : 'style-loader', 'css-loader'],
       },
       {
         test: /\.less$/,
         use: [
           isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
           'css-loader',
-          'less-loader'
-        ]
-      }
-    ]
+          'less-loader',
+        ],
+      },
+    ],
   },
-  resolve: { // 代表模块解析配置
+  resolve: {
+    // 代表模块解析配置
     extensions: ['.ts', '.js', '.vue', '.json'],
     alias: {
-      '@': path.resolve(__dirname, 'src')
-    }
+      '@': path.resolve(__dirname, 'src'),
+    },
   },
-  plugins: [ // 插件配置
+  plugins: [
+    // 插件配置
     ...setPlugins(),
     ...htmlPlugins,
     new VueLoaderPlugin(), // Vue Loader 插件 用于处理 .vue 文件
     // 生产环境提取 CSS
-    ...(isProduction ? [
-      new MiniCssExtractPlugin({
-        filename: '[name].[contenthash:8].css',
-        chunkFilename: '[id].[contenthash:8].css',
-      })
-    ] : []),
+    ...(isProduction
+      ? [
+          new MiniCssExtractPlugin({
+            filename: '[name].[contenthash:8].css',
+            chunkFilename: '[id].[contenthash:8].css',
+            ignoreOrder: true, // 忽略 CSS 顺序冲突警告
+          }),
+          // Gzip 压缩（仅用于支持 gzip_static 的服务器，GitHub Pages 不需要）
+          // 如果部署到 GitHub Pages，可以注释掉此插件
+          // new CompressionPlugin({
+          //   filename: '[path][base].gz',
+          //   algorithm: 'gzip',
+          //   test: /\.(js|css|html|svg)$/,
+          //   threshold: 10240,
+          //   minRatio: 0.8,
+          // }),
+        ]
+      : []),
   ],
   devServer: {
     static: {
       directory: path.join(__dirname, 'public'),
     },
-    // compress: true,
+    // compress: true, // 开发服务器也启用 Gzip
     port: 3000,
     hot: false,
     open: true,
@@ -239,12 +255,8 @@ export default {
     watchFiles: {
       paths: ['src/**/*'],
       options: {
-        ignored: [
-          '**/*.d.ts',
-          path.resolve(__dirname, '.temp-entries')
-        ]
-      }
-    }
-  }
+        ignored: ['**/*.d.ts', path.resolve(__dirname, '.temp-entries')],
+      },
+    },
+  },
 };
-
