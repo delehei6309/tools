@@ -9,7 +9,17 @@
     "lint": "eslint . --ext .vue,.js,.ts",
     "lint:fix": "eslint . --ext .vue,.js,.ts --fix",
     "format": "prettier --write \"src/**/*.{js,ts,vue,css,less,json}\"",
-    "format:check": "prettier --check \"src/**/*.{js,ts,vue,css,less,json}\""
+    "format:check": "prettier --check \"src/**/*.{js,ts,vue,css,less,json}\"",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,ts,vue}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,less,json}": [
+      "prettier --write"
+    ]
   },
   "keywords": [],
   "author": "",
@@ -30,8 +40,10 @@
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-vue": "^10.6.2",
     "html-webpack-plugin": "^5.6.5",
+    "husky": "^9.1.7",
     "less": "^4.5.1",
     "less-loader": "^12.3.0",
+    "lint-staged": "^16.2.7",
     "mini-css-extract-plugin": "^2.9.4",
     "prettier": "^3.7.4",
     "style-loader": "^4.0.0",
