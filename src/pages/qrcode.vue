@@ -46,7 +46,7 @@
                 </div>
             </el-form-item>
             <el-form-item label="二维码尺寸" size="default">
-                <el-input-number v-model="size" :min="80" :max="400"  step="10" :step-strictly="true"/>
+                <el-input-number v-model="size" :min="80" :max="400"  :step="10" :step-strictly="true"/>
             </el-form-item>
             <el-form-item>
                 <el-button type="primary" @click="onSubmit">生成二维码</el-button>
