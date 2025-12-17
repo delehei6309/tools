@@ -6,7 +6,7 @@
     </div>
     <div class="preview-content">
       <transition name="fade" mode="out-in">
-        <div class="qrcode-result" v-if="qrCodeDataUrl" key="result">
+        <div v-if="qrCodeDataUrl" key="result" class="qrcode-result">
           <div class="qrcode-container">
             <div class="qrcode-image">
               <img :src="qrCodeDataUrl" alt="QR Code" />
@@ -32,7 +32,7 @@
             </el-button>
           </div>
         </div>
-        <div v-else class="empty-state" key="empty">
+        <div v-else key="empty" class="empty-state">
           <el-empty description="暂无内容">
             <template #image>
               <el-icon :size="80" color="#c0c4cc"><Picture /></el-icon>
@@ -108,17 +108,17 @@ defineProps<{
   line-height: 1.6;
   max-height: 200px;
   overflow-y: auto;
-  
+
   /* 自定义滚动条样式 */
   &::-webkit-scrollbar {
     width: 4px;
   }
-  
+
   &::-webkit-scrollbar-thumb {
     background: #409eff;
     border-radius: 2px;
   }
-  
+
   &::-webkit-scrollbar-track {
     background: #f0f0f0;
     border-radius: 2px;

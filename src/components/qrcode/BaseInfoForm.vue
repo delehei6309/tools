@@ -8,9 +8,11 @@
     <el-form-item label="网址" prop="origin">
       <el-select
         :model-value="modelValue.origin"
-        @update:model-value="(val) => emit('update:modelValue', { ...props.modelValue, origin: val })"
         placeholder="请选择网址"
         style="width: 100%"
+        @update:model-value="
+          (val) => emit('update:modelValue', { ...props.modelValue, origin: val })
+        "
       >
         <el-option
           v-for="item in originOptions"
@@ -25,10 +27,12 @@
     <el-form-item v-if="modelValue.origin === 'custom'" label="自定义网址" prop="custom">
       <el-input
         :model-value="modelValue.custom"
-        @update:model-value="(val) => emit('update:modelValue', { ...props.modelValue, custom: val })"
         placeholder="请输入自定义网址"
         maxlength="100"
         :formatter="(value: string) => value.replace(/\s/g, '')"
+        @update:model-value="
+          (val) => emit('update:modelValue', { ...props.modelValue, custom: val })
+        "
       />
     </el-form-item>
 
@@ -36,11 +40,16 @@
     <el-form-item label="URL参数">
       <el-checkbox-group
         :model-value="modelValue.params"
-        @update:model-value="handleParamsChange"
         size="small"
         class="checkbox-group-box"
+        @update:model-value="handleParamsChange"
       >
-        <el-checkbox border v-for="option in paramOptions" :key="option.value" :value="option.value">
+        <el-checkbox
+          v-for="option in paramOptions"
+          :key="option.value"
+          border
+          :value="option.value"
+        >
           {{ option.label }}
         </el-checkbox>
         <el-button
@@ -62,10 +71,10 @@
     >
       <el-input
         :model-value="input.value"
-        @update:model-value="(val) => handleInputChange(index, val)"
         :placeholder="`请输入${input.label}`"
         :maxlength="100"
         :formatter="(value: string) => value.replace(/\s/g, '')"
+        @update:model-value="(val) => handleInputChange(index, val)"
       />
     </el-form-item>
   </div>
@@ -109,13 +118,12 @@ const handleParamsChange = (val: CheckboxValueType[]) => {
 const handleInputChange = (index: number, value: string) => {
   const newParamsInput = [...props.modelValue.paramsInput];
   newParamsInput[index] = { ...newParamsInput[index], value };
-  
+
   emit('update:modelValue', {
     ...props.modelValue,
     paramsInput: newParamsInput,
   });
 };
-
 </script>
 
 <style scoped lang="less">
