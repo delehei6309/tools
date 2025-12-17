@@ -3,6 +3,8 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import vuePlugin from 'eslint-plugin-vue';
 import vueParser from 'vue-eslint-parser';
+import prettierConfig from 'eslint-config-prettier';
+import prettierPlugin from 'eslint-plugin-prettier';
 
 export default [
   js.configs.recommended,
@@ -26,11 +28,14 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
+      prettier: prettierPlugin,
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
+      ...prettierConfig.rules,
+      'prettier/prettier': 'warn',
       'vue/multi-word-component-names': 'off',
-      'vue/html-indent': ['warn', 4], // 使用4空格缩进
+      'vue/html-indent': ['warn', 4],
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
       'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
