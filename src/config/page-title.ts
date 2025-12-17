@@ -1,3 +1,3 @@
 export default {
-    qrcode: '生成二维码',
-}
+  qrcode: '生成二维码',
+};
