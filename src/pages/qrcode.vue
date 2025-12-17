@@ -13,7 +13,8 @@
         <el-form :model="form" label-position="top" ref="formRef" :rules="rules">
           <!-- 基础信息表单 -->
           <BaseInfoForm
-            v-model="form"
+            :model-value="form"
+            @update:model-value="(val) => Object.assign(form, val)"
             :origin-options="originOptions"
             :param-options="paramOptions"
             @create-param="handleCreateParam"
@@ -104,7 +105,7 @@ const paramOptions = reactive<ParamOption[]>([...DEFAULT_PARAM_OPTIONS]);
 
 // 表单数据
 const form = reactive<QRCodeForm>({
-  origin: '',
+  origin: 'custom',
   custom: '',
   params: [],
   paramsInput: [],
