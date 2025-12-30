@@ -10,13 +10,13 @@
     <div class="content-wrapper">
       <!-- 左侧表单区 -->
       <el-card class="form-card" shadow="hover">
-        <el-form :model="form" label-position="top" ref="formRef" :rules="rules">
+        <el-form ref="formRef" :model="form" label-position="top" :rules="rules">
           <!-- 基础信息表单 -->
           <BaseInfoForm
             :model-value="form"
-            @update:model-value="(val) => Object.assign(form, val)"
             :origin-options="originOptions"
             :param-options="paramOptions"
+            @update:model-value="(val) => Object.assign(form, val)"
             @create-param="handleCreateParam"
           />
 
@@ -39,13 +39,13 @@
             <el-button
               type="primary"
               size="large"
-              @click="onSubmit"
               :icon="Check"
               style="width: 48%"
+              @click="onSubmit"
             >
               生成
             </el-button>
-            <el-button size="large" @click="onReset" :icon="RefreshLeft" style="width: 48%">
+            <el-button size="large" :icon="RefreshLeft" style="width: 48%" @click="onReset">
               重置
             </el-button>
           </el-form-item>
@@ -125,7 +125,7 @@ const qrCodeUrl = ref('');
 const dialogFormVisible = ref(false);
 
 // URL 校验规则
-const validateURL = (_rule: any, value: string, callback: any) => {
+const validateURL = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
   if (!value) {
     callback(new Error('请输入自定义网址'));
     return;
@@ -176,6 +176,7 @@ const onSubmit = async () => {
 
 // 重置表单
 const onReset = () => {
+  form.params = [];
   form.paramsInput = [];
   Object.assign(styleConfig, DEFAULT_STYLE_CONFIG);
   Object.assign(logoConfig, DEFAULT_LOGO_CONFIG);

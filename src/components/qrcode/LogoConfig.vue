@@ -29,8 +29,8 @@
             size="small"
             :icon="Delete"
             circle
-            @click="emit('remove-logo')"
             class="delete-btn"
+            @click="emit('remove-logo')"
           ></el-button>
         </div>
 
@@ -38,11 +38,11 @@
           <span class="label">大小</span>
           <el-slider
             :model-value="logoSize"
-            @update:model-value="emit('update:logoSize', $event)"
             :min="15"
             :max="30"
             :step="1"
             show-stops
+            @update:model-value="emit('update:logoSize', $event)"
           />
           <span class="value">{{ logoSize }}%</span>
         </div>

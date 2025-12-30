@@ -23,6 +23,16 @@
               <el-button type="primary" @click="goToQRCode">立即使用</el-button>
             </div>
           </el-card>
+
+          <el-card shadow="hover" class="tool-card">
+            <div class="tool-item">
+              <div>
+                <h4>📝 智能商品评价</h4>
+                <p>输入商品信息，一键生成多种风格的商品评价文案</p>
+              </div>
+              <el-button type="primary" @click="goToSmartReview">立即使用</el-button>
+            </div>
+          </el-card>
         </el-space>
 
         <el-divider />
@@ -40,6 +50,10 @@
 <script setup lang="ts">
 const goToQRCode = () => {
   window.location.href = './qrcode.html';
+};
+
+const goToSmartReview = () => {
+  window.location.href = './smart-review.html';
 };
 </script>
 
