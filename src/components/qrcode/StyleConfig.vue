@@ -9,13 +9,13 @@
       <div style="display: flex; align-items: center; gap: 12px">
         <el-input-number
           :model-value="size"
-          @update:model-value="emit('update:size', $event)"
           :min="80"
           :max="400"
           :step="10"
           :step-strictly="true"
           controls-position="right"
           style="width: 150px"
+          @update:model-value="emit('update:size', $event)"
         />
         <span style="color: #909399; font-size: 14px">像素</span>
       </div>

@@ -1,6 +1,6 @@
 <template>
   <el-dialog v-model="dialogVisible" title="新增参数" width="380" center @close="onClose">
-    <el-form :model="form" :rules="rules" label-position="top" ref="formRef">
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
       <el-form-item label="参数名称" prop="label">
         <el-input
           v-model="form.label"

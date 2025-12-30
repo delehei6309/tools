@@ -235,7 +235,7 @@ export default {
       directory: path.join(__dirname, 'public'),
     },
     // compress: true, // 开发服务器也启用 Gzip
-    port: 3000,
+    port: 3001,
     hot: false,
     open: true,
     client: {
