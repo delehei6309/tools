@@ -607,8 +607,6 @@ async function downloadPoster() {
   try {
     ElMessage.info('正在生成海报...');
 
-    // 获取原始尺寸
-    const rect = posterRef.value.getBoundingClientRect();
     const scale = 3; // 提高到3倍以获得更清晰的图像
 
     const canvas = await html2canvas(posterRef.value, {

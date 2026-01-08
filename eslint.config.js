@@ -37,6 +37,7 @@ export default [
         HTMLCanvasElement: 'readonly',
         CanvasRenderingContext2D: 'readonly',
         Blob: 'readonly',
+        localStorage: 'readonly',
       },
     },
     plugins: {
