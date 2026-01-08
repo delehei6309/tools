@@ -192,7 +192,8 @@
       <el-dialog
         v-model="posterVisible"
         title="分享海报"
-        width="420px"
+        :width="isMobile ? '100%' : '420px'"
+        :fullscreen="isMobile"
         :close-on-click-modal="false"
         class="poster-dialog"
       >
@@ -412,6 +413,10 @@ const posterVisible = ref(false);
 const posterRef = ref<HTMLElement | null>(null);
 const posterChartRef = ref<HTMLElement | null>(null);
 let posterChartInstance: echarts.ECharts | null = null;
+
+// 判断是否为移动端
+const windowWidth = ref(window.innerWidth);
+const isMobile = computed(() => windowWidth.value < 768);
 
 // 当前日期
 const currentDate = computed(() => {
@@ -1095,7 +1100,17 @@ onMounted(async () => {
   }
 });
 
+// 窗口大小变化监听
+const handleResize = () => {
+  windowWidth.value = window.innerWidth;
+};
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize);
+});
+
 onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
   posterChartInstance?.dispose();
   posterChartInstance = null;
 });
@@ -1265,10 +1280,25 @@ watch(
 
 // 海报弹窗
 .poster-dialog {
+  :deep(.el-dialog) {
+    margin: 0 auto;
+  }
+
+  :deep(.el-dialog__header) {
+    padding: 16px 20px;
+    border-bottom: 1px solid #eee;
+  }
+
   :deep(.el-dialog__body) {
-    padding: 20px;
-    max-height: 70vh;
+    padding: 15px;
+    max-height: calc(100vh - 140px);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 12px 20px;
+    border-top: 1px solid #eee;
   }
 }
 
@@ -1276,19 +1306,21 @@ watch(
 .poster-wrapper {
   display: flex;
   justify-content: center;
-  padding: 20px;
+  padding: 10px;
   background: #f5f5f5;
   border-radius: 8px;
+  min-height: 200px;
 }
 
 .poster {
-  width: 375px;
+  width: 100%;
+  max-width: 375px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px;
   color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
 }
 
 .poster-header {
@@ -1443,21 +1475,191 @@ watch(
 }
 
 @media (max-width: 768px) {
+  .main-page {
+    padding: 15px;
+  }
+
   .header {
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
+    align-items: flex-start;
 
     h1 {
-      font-size: 20px;
+      font-size: 18px;
     }
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .summary-cards {
     grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
-  .summary-card .summary-value {
+  .summary-card {
+    :deep(.el-card__body) {
+      padding: 12px;
+    }
+
+    .summary-label {
+      font-size: 12px;
+    }
+
+    .summary-value {
+      font-size: 18px;
+    }
+  }
+
+  .data-card {
+    :deep(.el-card__header) {
+      padding: 12px 15px;
+    }
+
+    :deep(.el-card__body) {
+      padding: 0;
+    }
+  }
+
+  .card-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+
+    span {
+      font-size: 14px;
+    }
+  }
+
+  // 表格横向滚动
+  :deep(.el-table) {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-page {
+    padding: 10px;
+  }
+
+  .header {
+    h1 {
+      font-size: 16px;
+    }
+  }
+
+  .header-actions {
+    gap: 6px;
+
+    .el-button {
+      padding: 8px;
+    }
+
+    .el-button--text {
+      font-size: 12px;
+      padding: 8px 4px;
+    }
+  }
+
+  .summary-cards {
+    gap: 8px;
+  }
+
+  .summary-card {
+    :deep(.el-card__body) {
+      padding: 10px 8px;
+    }
+
+    .summary-label {
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .summary-value {
+      font-size: 16px;
+    }
+  }
+
+  .sync-status {
+    font-size: 11px;
+    margin-bottom: 10px;
+  }
+
+  .login-card {
+    padding: 25px 20px;
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+  }
+
+  .login-tips {
+    font-size: 12px;
+    padding: 12px;
+  }
+
+  // 海报弹窗适配
+  .poster-dialog {
+    :deep(.el-dialog) {
+      width: 95% !important;
+      margin: 10px auto;
+    }
+  }
+
+  .poster-wrapper {
+    padding: 10px;
+  }
+
+  .poster {
+    width: 100%;
+    max-width: 340px;
+    padding: 16px;
+  }
+
+  .poster-header .poster-title {
     font-size: 18px;
+    letter-spacing: 1px;
+  }
+
+  .poster-chart {
+    height: 160px;
+    padding: 8px;
+  }
+
+  .poster-stats {
+    gap: 8px;
+  }
+
+  .stat-item {
+    padding: 12px 8px;
+
+    .stat-value {
+      font-size: 16px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+    }
+  }
+
+  .poster-details {
+    padding: 12px;
+
+    .detail-row {
+      padding: 6px 8px;
+      font-size: 12px;
+
+      .detail-month {
+        flex: 0 0 60px;
+      }
+
+      .detail-status {
+        flex: 0 0 80px;
+      }
+    }
   }
 }
 </style>
