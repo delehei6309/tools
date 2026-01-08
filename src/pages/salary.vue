@@ -1,9 +1,10 @@
 <template>
   <el-config-provider :locale="locale">
-    <div class="salary-container">
+    <div class="salary-container" :class="{ 'is-mobile': isMobile }">
       <!-- 登录页面 -->
       <div v-if="!isLoggedIn" class="login-page">
         <div class="login-card">
+          <div class="login-icon">💰</div>
           <h1>工资欠款计算器</h1>
           <el-form @submit.prevent="handleLogin">
             <el-form-item>
@@ -31,7 +32,7 @@
             <p>Token 获取方式：</p>
             <p>GitHub → Settings → Developer settings</p>
             <p>→ Personal access tokens → Tokens (classic)</p>
-            <p>勾选 <code>gist</code> 权限，Expiration 选 No expiration</p>
+            <p>勾选 <code>gist</code> 权限</p>
             <p v-if="isDev" class="dev-tip">开发环境可输入 <code>test123456</code> 跳过验证</p>
           </div>
         </div>
@@ -39,153 +40,360 @@
 
       <!-- 主页面 -->
       <div v-else class="main-page">
-        <!-- 顶部栏 -->
-        <div class="header">
-          <h1>工资欠款计算器<span v-if="isDevMode" class="dev-badge">开发模式</span></h1>
-          <div class="header-actions">
-            <el-tooltip :content="isMasked ? '显示金额' : '隐藏金额'">
-              <el-button :icon="isMasked ? Hide : View" circle @click="toggleMask" />
-            </el-tooltip>
-            <el-tooltip :content="isDevMode ? '开发模式不支持云同步' : '从云端同步'">
+        <!-- ==================== PC 端布局 ==================== -->
+        <template v-if="!isMobile">
+          <!-- PC 端顶部 -->
+          <div class="header">
+            <h1>
+              💰 工资欠款计算器
+              <span v-if="isDevMode" class="dev-badge">开发模式</span>
+            </h1>
+            <div class="header-actions">
+              <el-button :icon="isMasked ? Hide : View" @click="toggleMask">
+                {{ isMasked ? '显示金额' : '隐藏金额' }}
+              </el-button>
               <el-button
                 :icon="Download"
-                circle
                 :loading="syncLoading"
                 :disabled="isDevMode"
                 @click="syncFromCloud"
-              />
-            </el-tooltip>
-            <el-tooltip :content="isDevMode ? '开发模式不支持云同步' : '同步到云端'">
+              >
+                从云端同步
+              </el-button>
               <el-button
+                type="primary"
                 :icon="Upload"
-                circle
                 :loading="syncLoading"
                 :disabled="isDevMode"
                 @click="syncToCloud"
-              />
-            </el-tooltip>
-            <el-button type="danger" text @click="handleLogout">退出登录</el-button>
+              >
+                同步到云端
+              </el-button>
+              <el-button type="danger" text @click="handleLogout">退出登录</el-button>
+            </div>
           </div>
-        </div>
 
-        <!-- 同步状态 -->
-        <div v-if="lastSyncTime" class="sync-status">上次同步：{{ formatDate(lastSyncTime) }}</div>
+          <!-- PC 端同步状态 -->
+          <div v-if="lastSyncTime" class="sync-status-pc">上次同步：{{ lastSyncTime }}</div>
 
-        <!-- 汇总卡片 -->
-        <div class="summary-cards">
-          <el-card class="summary-card">
-            <div class="summary-label">总应发</div>
-            <div class="summary-value">{{ formatAmount(totalDue) }}</div>
-          </el-card>
-          <el-card class="summary-card">
-            <div class="summary-label">总实发</div>
-            <div class="summary-value">{{ formatAmount(totalPaid) }}</div>
-          </el-card>
-          <el-card class="summary-card total-owed">
-            <div class="summary-label">总欠款</div>
-            <div class="summary-value danger">{{ formatAmount(totalOwed) }}</div>
-          </el-card>
-          <el-card class="summary-card">
-            <div class="summary-label">欠款月份</div>
-            <div class="summary-value">{{ owedMonthsCount }} 个</div>
-          </el-card>
-        </div>
+          <!-- PC 端汇总卡片 -->
+          <div class="summary-cards">
+            <el-card class="summary-card">
+              <div class="summary-label">总应发</div>
+              <div class="summary-value">¥{{ formatAmount(totalDue) }}</div>
+            </el-card>
+            <el-card class="summary-card">
+              <div class="summary-label">总实发</div>
+              <div class="summary-value success">¥{{ formatAmount(totalPaid) }}</div>
+            </el-card>
+            <el-card class="summary-card">
+              <div class="summary-label">总欠款</div>
+              <div class="summary-value danger">¥{{ formatAmount(totalOwed) }}</div>
+            </el-card>
+            <el-card class="summary-card">
+              <div class="summary-label">欠款月份</div>
+              <div class="summary-value">{{ owedMonthsCount }} 个月</div>
+            </el-card>
+          </div>
 
-        <!-- 月度应发表 -->
-        <el-card class="data-card">
-          <template #header>
-            <div class="card-header">
-              <span>月度应发表</span>
-              <el-button type="primary" :icon="Plus" @click="showAddDueDialog">添加月份</el-button>
+          <!-- PC 端月度明细表格 -->
+          <el-card class="data-card">
+            <template #header>
+              <div class="card-header">
+                <span>📋 月度明细</span>
+                <div class="header-btns">
+                  <el-button type="primary" :icon="Share" @click="showPosterDialog">
+                    生成海报
+                  </el-button>
+                </div>
+              </div>
+            </template>
+            <el-table :data="monthlyDetails" stripe style="width: 100%">
+              <el-table-column prop="month" label="月份" width="120" align="center" />
+              <el-table-column prop="due" label="应发" align="right">
+                <template #default="{ row }">¥{{ formatAmount(row.due) }}</template>
+              </el-table-column>
+              <el-table-column prop="paid" label="实发" align="right">
+                <template #default="{ row }">
+                  <span class="success">¥{{ formatAmount(row.paid) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="owed" label="欠款" align="right">
+                <template #default="{ row }">
+                  <span :class="row.owed > 0 ? 'danger' : 'success'">
+                    {{ row.owed > 0 ? `¥${formatAmount(row.owed)}` : '0' }}
+                  </span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+
+          <!-- PC 端应发表格 -->
+          <el-card class="data-card">
+            <template #header>
+              <div class="card-header">
+                <span>📝 月度应发</span>
+                <el-button type="primary" :icon="Plus" @click="showAddDueDialog">
+                  添加应发
+                </el-button>
+              </div>
+            </template>
+            <el-table :data="monthlyDueList" stripe style="width: 100%">
+              <el-table-column prop="month" label="月份" width="120" align="center" />
+              <el-table-column prop="amount" label="应发金额" align="right">
+                <template #default="{ row }">¥{{ formatAmount(row.amount) }}</template>
+              </el-table-column>
+              <el-table-column prop="note" label="备注" align="center" />
+              <el-table-column label="创建时间" width="180" align="center">
+                <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="80" align="center">
+                <template #default="{ row }">
+                  <el-button
+                    type="danger"
+                    text
+                    :icon="Delete"
+                    @click="deleteDue(row.month)"
+                  ></el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+
+          <!-- PC 端实发表格 -->
+          <el-card class="data-card">
+            <template #header>
+              <div class="card-header">
+                <span>💵 实发明细</span>
+                <el-button type="primary" :icon="Plus" @click="showAddPaymentDialog">
+                  添加实发
+                </el-button>
+              </div>
+            </template>
+            <el-table :data="paymentsList" stripe style="width: 100%">
+              <el-table-column prop="date" label="到账日期" width="120" align="center" />
+              <el-table-column prop="amount" label="金额" align="right">
+                <template #default="{ row }">
+                  <span class="success">¥{{ formatAmount(row.amount) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="targetMonth" label="归属月份 " align="center">
+                <template #default="{ row }">{{ row.targetMonth || '自动分配' }}</template>
+              </el-table-column>
+              <el-table-column prop="note" label="备注" align="center" />
+              <el-table-column label="创建时间" width="180" align="center">
+                <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="140" align="center">
+                <template #default="{ row, $index }">
+                  <el-button
+                    type="primary"
+                    text
+                    :icon="Edit"
+                    @click="showEditPaymentDialog(row, $index)"
+                  ></el-button>
+                  <el-button
+                    type="danger"
+                    text
+                    :icon="Delete"
+                    @click="deletePayment($index)"
+                  ></el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </template>
+
+        <!-- ==================== 移动端布局 ==================== -->
+        <template v-else>
+          <!-- 移动端顶部栏 -->
+          <div class="mobile-header">
+            <div class="header-left">
+              <span class="app-title">工资欠款</span>
+              <span v-if="isDevMode" class="dev-badge">开发</span>
             </div>
-          </template>
-          <el-table :data="monthlyDueList" stripe>
-            <el-table-column prop="month" label="月份" width="120" sortable />
-            <el-table-column label="应发金额" width="150">
-              <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
-            </el-table-column>
-            <el-table-column prop="note" label="备注" />
-            <el-table-column label="创建时间" width="180">
-              <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="80" fixed="right" align="center">
-              <template #default="{ row }">
-                <el-button type="danger" text :icon="Delete" @click="deleteDue(row.month)" />
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <!-- 实发明细表 -->
-        <el-card class="data-card">
-          <template #header>
-            <div class="card-header">
-              <span>实发明细表</span>
-              <el-button type="primary" :icon="Plus" @click="showAddPaymentDialog"
-                >添加明细</el-button
+            <div class="header-right">
+              <div class="header-icon" @click="toggleMask">
+                <el-icon><component :is="isMasked ? Hide : View" /></el-icon>
+              </div>
+              <div
+                class="header-icon"
+                :class="{ disabled: isDevMode }"
+                @click="!isDevMode && syncFromCloud()"
               >
+                <el-icon v-if="!syncLoading"><Download /></el-icon>
+                <el-icon v-else class="is-loading"><Loading /></el-icon>
+              </div>
+              <div
+                class="header-icon"
+                :class="{ disabled: isDevMode }"
+                @click="!isDevMode && syncToCloud()"
+              >
+                <el-icon v-if="!syncLoading"><Upload /></el-icon>
+                <el-icon v-else class="is-loading"><Loading /></el-icon>
+              </div>
+              <div class="header-icon logout" @click="handleLogout">
+                <el-icon><SwitchButton /></el-icon>
+              </div>
             </div>
-          </template>
-          <el-table :data="paymentsList" stripe>
-            <el-table-column prop="date" label="到账日期" width="120" sortable />
-            <el-table-column label="金额" width="150">
-              <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
-            </el-table-column>
-            <el-table-column label="归属月份" width="120">
-              <template #default="{ row }">{{ row.targetMonth || '自动' }}</template>
-            </el-table-column>
-            <el-table-column prop="note" label="备注" />
-            <el-table-column label="创建时间" width="180">
-              <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="130" align="center" fixed="right">
-              <template #default="{ row, $index }">
-                <el-button
-                  type="primary"
-                  text
-                  :icon="Edit"
-                  @click="showEditPaymentDialog(row, $index)"
-                />
-                <el-button type="danger" text :icon="Delete" @click="deletePayment($index)" />
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+          </div>
 
-        <!-- 月度明细（计算结果） -->
-        <el-card class="data-card">
-          <template #header>
-            <div class="card-header">
+          <!-- 同步状态 -->
+          <div v-if="lastSyncTime" class="sync-status">
+            <el-icon><Clock /></el-icon>
+            {{ formatShortDate(lastSyncTime) }}
+          </div>
+
+          <!-- 汇总区域 - 移动端优化 -->
+          <div class="summary-section">
+            <div class="summary-main">
+              <div class="summary-main-label">总欠款</div>
+              <div class="summary-main-value">¥{{ formatAmount(totalOwed) }}</div>
+              <div class="summary-main-months">{{ owedMonthsCount }} 个月未结清</div>
+            </div>
+            <div class="summary-row">
+              <div class="summary-item">
+                <span class="label">应发</span>
+                <span class="value">¥{{ formatAmount(totalDue) }}</span>
+              </div>
+              <div class="summary-divider"></div>
+              <div class="summary-item">
+                <span class="label">实发</span>
+                <span class="value success">¥{{ formatAmount(totalPaid) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 切换 -->
+          <div class="tab-bar">
+            <div
+              class="tab-item"
+              :class="{ active: activeTab === 'detail' }"
+              @click="activeTab = 'detail'"
+            >
+              月度明细
+            </div>
+            <div
+              class="tab-item"
+              :class="{ active: activeTab === 'due' }"
+              @click="activeTab = 'due'"
+            >
+              应发记录
+            </div>
+            <div
+              class="tab-item"
+              :class="{ active: activeTab === 'payment' }"
+              @click="activeTab = 'payment'"
+            >
+              实发记录
+            </div>
+          </div>
+
+          <!-- 月度明细列表 -->
+          <div v-show="activeTab === 'detail'" class="list-section">
+            <div class="list-header">
               <span>月度明细</span>
-              <el-button type="primary" :icon="Share" @click="showPosterDialog"
-                >生成分享海报</el-button
-              >
+              <div class="poster-btn" @click="showPosterDialog">
+                <el-icon><Share /></el-icon>
+                <span>生成海报</span>
+              </div>
             </div>
-          </template>
-          <el-table :data="monthlyDetails" stripe>
-            <el-table-column prop="month" label="月份" width="120" align="center" />
-            <el-table-column label="应发" align="right">
-              <template #default="{ row }">{{ formatAmount(row.due) }}</template>
-            </el-table-column>
-            <el-table-column label="已冲抵" align="right">
-              <template #default="{ row }">{{ formatAmount(row.paid) }}</template>
-            </el-table-column>
-            <el-table-column label="欠款" align="right">
-              <template #default="{ row }">
-                <span :class="{ danger: row.owed > 0, success: row.owed <= 0 }">
-                  {{ formatAmount(row.owed) }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag v-if="row.owed > 0" type="danger">欠款</el-tag>
-                <el-tag v-else-if="row.owed < 0" type="warning">过付</el-tag>
-                <el-tag v-else type="success">正常</el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+            <div v-if="monthlyDetails.length === 0" class="empty-state">
+              <div class="empty-icon">📊</div>
+              <div class="empty-text">暂无数据</div>
+              <div class="empty-tip">请先添加月度应发记录</div>
+            </div>
+            <div v-else class="card-list">
+              <div
+                v-for="item in monthlyDetails"
+                :key="item.month"
+                class="detail-card"
+                :class="{ 'is-owed': item.owed > 0, 'is-paid': item.owed <= 0 }"
+              >
+                <div class="card-left">
+                  <div class="card-month">{{ item.month }}</div>
+                  <div class="card-sub">应发 ¥{{ formatAmount(item.due) }}</div>
+                </div>
+                <div class="card-right">
+                  <div class="card-status" :class="item.owed > 0 ? 'danger' : 'success'">
+                    {{ item.owed > 0 ? `欠 ¥${formatAmount(item.owed)}` : '已付清' }}
+                  </div>
+                  <div class="card-paid">已付 ¥{{ formatAmount(item.paid) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 应发记录列表 -->
+          <div v-show="activeTab === 'due'" class="list-section">
+            <div class="list-header">
+              <span>应发记录 ({{ monthlyDueList.length }})</span>
+            </div>
+            <div v-if="monthlyDueList.length === 0" class="empty-state">
+              <div class="empty-icon">📝</div>
+              <div class="empty-text">暂无应发记录</div>
+              <div class="empty-tip">点击下方按钮添加</div>
+            </div>
+            <div v-else class="card-list">
+              <div v-for="item in monthlyDueList" :key="item.month" class="record-card">
+                <div class="card-content">
+                  <div class="card-main">
+                    <div class="card-title">{{ item.month }}</div>
+                    <div class="card-amount">¥{{ formatAmount(item.amount) }}</div>
+                  </div>
+                  <div class="card-meta">
+                    <span v-if="item.note" class="card-note">{{ item.note }}</span>
+                    <span class="card-time">{{ formatShortDate(item.createdAt) }}</span>
+                  </div>
+                </div>
+                <div class="card-action delete" @click="deleteDue(item.month)">
+                  <el-icon><Delete /></el-icon>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 实发记录列表 -->
+          <div v-show="activeTab === 'payment'" class="list-section">
+            <div class="list-header">
+              <span>实发记录 ({{ paymentsList.length }})</span>
+            </div>
+            <div v-if="paymentsList.length === 0" class="empty-state">
+              <div class="empty-icon">💵</div>
+              <div class="empty-text">暂无实发记录</div>
+              <div class="empty-tip">点击下方按钮添加</div>
+            </div>
+            <div v-else class="card-list">
+              <div v-for="(item, index) in paymentsList" :key="index" class="record-card">
+                <div class="card-content" @click="showEditPaymentDialog(item, index)">
+                  <div class="card-main">
+                    <div class="card-title">{{ item.date }}</div>
+                    <div class="card-amount success">¥{{ formatAmount(item.amount) }}</div>
+                  </div>
+                  <div class="card-meta">
+                    <span class="card-target">{{ item.targetMonth || '自动分配' }}</span>
+                    <span v-if="item.note" class="card-note">{{ item.note }}</span>
+                  </div>
+                </div>
+                <div class="card-action delete" @click="deletePayment(index)">
+                  <el-icon><Delete /></el-icon>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部悬浮按钮 -->
+          <div class="fab-container">
+            <div v-if="activeTab === 'due'" class="fab" @click="showAddDueDialog">
+              <el-icon><Plus /></el-icon>
+              <span>添加应发</span>
+            </div>
+            <div v-if="activeTab === 'payment'" class="fab" @click="showAddPaymentDialog">
+              <el-icon><Plus /></el-icon>
+              <span>添加实发</span>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- 海报弹窗 -->
@@ -260,8 +468,14 @@
       </el-dialog>
 
       <!-- 添加月度应发弹窗 -->
-      <el-dialog v-model="addDueVisible" title="添加月度应发" width="400px">
-        <el-form :model="dueForm" label-width="80px">
+      <el-dialog
+        v-model="addDueVisible"
+        title="添加月度应发"
+        :width="isMobile ? '90%' : '400px'"
+        :show-close="true"
+        class="mobile-dialog"
+      >
+        <el-form :model="dueForm" label-position="top">
           <el-form-item label="月份" required>
             <el-date-picker
               v-model="dueForm.month"
@@ -270,22 +484,29 @@
               format="YYYY-MM"
               value-format="YYYY-MM"
               style="width: 100%"
+              size="large"
             />
           </el-form-item>
           <el-form-item label="应发金额" required>
             <el-input
               v-model="dueForm.amount"
               placeholder="请输入金额"
+              size="large"
+              inputmode="decimal"
               @input="handleAmountInput($event, 'due')"
-            />
+            >
+              <template #prefix>¥</template>
+            </el-input>
           </el-form-item>
           <el-form-item label="备注">
-            <el-input v-model="dueForm.note" placeholder="可选" />
+            <el-input v-model="dueForm.note" placeholder="可选" size="large" />
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="addDueVisible = false">取消</el-button>
-          <el-button type="primary" @click="addDue">确定</el-button>
+          <div class="dialog-footer">
+            <el-button size="large" @click="addDueVisible = false">取消</el-button>
+            <el-button type="primary" size="large" @click="addDue">确定</el-button>
+          </div>
         </template>
       </el-dialog>
 
@@ -293,9 +514,10 @@
       <el-dialog
         v-model="paymentDialogVisible"
         :title="isEditingPayment ? '编辑实发明细' : '添加实发明细'"
-        width="400px"
+        :width="isMobile ? '90%' : '400px'"
+        class="mobile-dialog"
       >
-        <el-form :model="paymentForm" label-width="80px">
+        <el-form :model="paymentForm" label-position="top">
           <el-form-item label="到账日期" required>
             <el-date-picker
               v-model="paymentForm.date"
@@ -304,14 +526,19 @@
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
               style="width: 100%"
+              size="large"
             />
           </el-form-item>
           <el-form-item label="金额" required>
             <el-input
               v-model="paymentForm.amount"
               placeholder="请输入金额"
+              size="large"
+              inputmode="decimal"
               @input="handleAmountInput($event, 'payment')"
-            />
+            >
+              <template #prefix>¥</template>
+            </el-input>
           </el-form-item>
           <el-form-item label="归属月份">
             <el-select
@@ -319,6 +546,7 @@
               placeholder="自动（按顺序补齐）"
               clearable
               style="width: 100%"
+              size="large"
             >
               <el-option
                 v-for="item in monthlyDueList"
@@ -329,12 +557,14 @@
             </el-select>
           </el-form-item>
           <el-form-item label="备注">
-            <el-input v-model="paymentForm.note" placeholder="可选" />
+            <el-input v-model="paymentForm.note" placeholder="可选" size="large" />
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="paymentDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="savePayment">确定</el-button>
+          <div class="dialog-footer">
+            <el-button size="large" @click="paymentDialogVisible = false">取消</el-button>
+            <el-button type="primary" size="large" @click="savePayment">确定</el-button>
+          </div>
         </template>
       </el-dialog>
     </div>
@@ -345,7 +575,19 @@
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue';
 import { ElMessage, ElMessageBox, ElConfigProvider } from 'element-plus';
 import zhCn from 'element-plus/es/locale/lang/zh-cn';
-import { View, Hide, Upload, Download, Plus, Delete, Edit, Share } from '@element-plus/icons-vue';
+import {
+  View,
+  Hide,
+  Upload,
+  Download,
+  Plus,
+  Delete,
+  Edit,
+  Share,
+  SwitchButton,
+  Clock,
+  Loading,
+} from '@element-plus/icons-vue';
 import Big from 'big.js';
 import * as echarts from 'echarts';
 import html2canvas from 'html2canvas';
@@ -417,6 +659,9 @@ let posterChartInstance: echarts.ECharts | null = null;
 // 判断是否为移动端
 const windowWidth = ref(window.innerWidth);
 const isMobile = computed(() => windowWidth.value < 768);
+
+// 当前激活的 Tab
+const activeTab = ref<'detail' | 'due' | 'payment'>('detail');
 
 // 当前日期
 const currentDate = computed(() => {
@@ -528,6 +773,41 @@ function formatDate(dateStr: string): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+  });
+}
+
+// 格式化日期时间（PC端用）
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date
+    .toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    .replace(/\//g, '-');
+}
+
+// 格式化短日期（移动端用）
+function formatShortDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const isThisYear = date.getFullYear() === now.getFullYear();
+
+  if (isThisYear) {
+    return date.toLocaleDateString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+    });
+  }
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
 }
 
@@ -1126,14 +1406,23 @@ watch(
   { deep: true }
 );
 </script>
-
+<style>
+body {
+  margin: 0;
+}
+</style>
 <style scoped lang="less">
+// ==================== 基础样式 ====================
 .salary-container {
   min-height: 100vh;
   background: #f5f7fa;
+
+  &.is-mobile {
+    background: #f0f2f5;
+  }
 }
 
-// 登录页面
+// ==================== 登录页面 ====================
 .login-page {
   display: flex;
   justify-content: center;
@@ -1142,37 +1431,55 @@ watch(
   padding: 20px;
 }
 
+// 移动端登录页渐变背景
+.is-mobile .login-page {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
 .login-card {
   background: #fff;
-  padding: 40px;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 40px 30px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
+
+  .login-icon {
+    text-align: center;
+    font-size: 48px;
+    margin-bottom: 10px;
+  }
 
   h1 {
     text-align: center;
     margin-bottom: 30px;
     color: #303133;
+    font-size: 22px;
   }
+}
+
+.is-mobile .login-card {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
 .login-tips {
   margin-top: 20px;
   padding: 15px;
   background: #f5f7fa;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 8px;
+  font-size: 12px;
   color: #909399;
+  line-height: 1.6;
 
   p {
-    margin: 5px 0;
+    margin: 4px 0;
   }
 
   code {
     background: #e4e7ed;
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: 4px;
+    font-size: 11px;
   }
 
   .dev-tip {
@@ -1181,13 +1488,19 @@ watch(
   }
 }
 
-// 主页面
+// ==================== PC 端主页面 ====================
 .main-page {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
+.is-mobile .main-page {
+  padding: 0;
+  padding-bottom: 100px;
+}
+
+// PC 端顶部
 .header {
   display: flex;
   justify-content: space-between;
@@ -1203,29 +1516,20 @@ watch(
   }
 }
 
-.dev-badge {
-  font-size: 12px;
-  padding: 2px 8px;
-  background: #e6a23c;
-  color: #fff;
-  border-radius: 4px;
-  font-weight: normal;
-}
-
 .header-actions {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
-.sync-status {
+.sync-status-pc {
   text-align: right;
   font-size: 12px;
   color: #909399;
   margin-bottom: 15px;
 }
 
-// 汇总卡片
+// PC 端汇总卡片
 .summary-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1250,10 +1554,14 @@ watch(
     &.danger {
       color: #f56c6c;
     }
+
+    &.success {
+      color: #67c23a;
+    }
   }
 }
 
-// 数据卡片
+// PC 端数据卡片
 .data-card {
   margin-bottom: 20px;
 }
@@ -1269,24 +1577,486 @@ watch(
   }
 }
 
-// 状态颜色
-.danger {
-  color: #f56c6c;
+.dev-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: #e6a23c;
+  color: #fff;
+  border-radius: 4px;
+  font-weight: normal;
 }
 
-.success {
-  color: #67c23a;
+// ==================== 移动端主页面 ====================
+// 移动端顶部栏
+.mobile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .app-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    &.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    &.logout {
+      background: rgba(255, 100, 100, 0.3);
+    }
+
+    .el-icon {
+      font-size: 18px;
+    }
+
+    .is-loading {
+      animation: rotate 1s linear infinite;
+    }
+  }
 }
 
-// 海报弹窗
+// 移动端开发标记
+.is-mobile .dev-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  font-weight: normal;
+}
+
+// 移动端同步状态
+.sync-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #909399;
+  padding: 6px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+// ==================== 汇总区域 ====================
+.summary-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px 16px;
+  color: #fff;
+}
+
+.summary-main {
+  text-align: center;
+  margin-bottom: 20px;
+
+  .summary-main-label {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-bottom: 4px;
+  }
+
+  .summary-main-value {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .summary-main-months {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-top: 4px;
+  }
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px 0;
+
+  .summary-item {
+    flex: 1;
+    text-align: center;
+
+    .label {
+      display: block;
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }
+
+    .value {
+      font-size: 18px;
+      font-weight: 600;
+
+      &.success {
+        color: #6ee7b7;
+      }
+    }
+  }
+
+  .summary-divider {
+    width: 1px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+// ==================== Tab 栏 ====================
+.tab-bar {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 60px;
+  z-index: 99;
+
+  .tab-item {
+    flex: 1;
+    text-align: center;
+    padding: 14px 0;
+    font-size: 14px;
+    color: #606266;
+    position: relative;
+    cursor: pointer;
+    transition: color 0.2s;
+
+    &.active {
+      color: #667eea;
+      font-weight: 500;
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 3px;
+        background: #667eea;
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+// ==================== 列表区域 ====================
+.list-section {
+  padding: 12px;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 4px 12px;
+
+  span {
+    font-size: 15px;
+    font-weight: 500;
+    color: #303133;
+  }
+}
+
+// 生成海报按钮
+.poster-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  span {
+    color: #fff;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  .el-icon {
+    font-size: 14px;
+  }
+}
+
+// 空状态
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+
+  .empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+
+  .empty-text {
+    font-size: 16px;
+    color: #606266;
+    margin-bottom: 8px;
+  }
+
+  .empty-tip {
+    font-size: 13px;
+    color: #909399;
+  }
+}
+
+// 卡片列表
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// 月度明细卡片
+.detail-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  &.is-owed {
+    border-left: 4px solid #f56c6c;
+  }
+
+  &.is-paid {
+    border-left: 4px solid #67c23a;
+  }
+
+  .card-left {
+    .card-month {
+      font-size: 16px;
+      font-weight: 600;
+      color: #303133;
+      margin-bottom: 4px;
+    }
+
+    .card-sub {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
+
+  .card-right {
+    text-align: right;
+
+    .card-status {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+
+      &.danger {
+        color: #f56c6c;
+      }
+
+      &.success {
+        color: #67c23a;
+      }
+    }
+
+    .card-paid {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
+}
+
+// 记录卡片（应发/实发）
+.record-card {
+  display: flex;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  .card-content {
+    flex: 1;
+    padding: 14px 16px;
+    cursor: pointer;
+
+    &:active {
+      background: #f9f9f9;
+    }
+  }
+
+  .card-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: #303133;
+    }
+
+    .card-amount {
+      font-size: 17px;
+      font-weight: 600;
+      color: #303133;
+
+      &.success {
+        color: #67c23a;
+      }
+    }
+  }
+
+  .card-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #909399;
+
+    .card-target {
+      color: #667eea;
+    }
+  }
+
+  .card-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    color: #fff;
+    cursor: pointer;
+
+    &.delete {
+      background: #f56c6c;
+    }
+
+    .el-icon {
+      font-size: 18px;
+    }
+  }
+}
+
+// ==================== 悬浮按钮 ====================
+.fab-container {
+  position: fixed;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 100;
+}
+
+.fab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 50px;
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  .el-icon {
+    font-size: 18px;
+  }
+}
+
+// ==================== 弹窗样式 ====================
+.mobile-dialog {
+  :deep(.el-dialog) {
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  :deep(.el-dialog__header) {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    margin: 0;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 20px;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 16px 20px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .dialog-footer {
+    display: flex;
+    gap: 12px;
+
+    .el-button {
+      flex: 1;
+    }
+  }
+}
+
+// ==================== 海报弹窗 ====================
 .poster-dialog {
   :deep(.el-dialog) {
     margin: 0 auto;
+    border-radius: 16px;
   }
 
   :deep(.el-dialog__header) {
     padding: 16px 20px;
     border-bottom: 1px solid #eee;
+    margin: 0;
   }
 
   :deep(.el-dialog__body) {
@@ -1302,7 +2072,6 @@ watch(
   }
 }
 
-// 海报容器
 .poster-wrapper {
   display: flex;
   justify-content: center;
@@ -1330,17 +2099,15 @@ watch(
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 
   .poster-title {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     margin: 0 0 8px 0;
-    letter-spacing: 2px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    letter-spacing: 1px;
   }
 
-  .poster-subtitle {
-    font-size: 13px;
-    opacity: 0.85;
-    margin: 0;
+  .poster-date {
+    font-size: 12px;
+    opacity: 0.8;
   }
 }
 
@@ -1349,37 +2116,30 @@ watch(
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 16px;
-  backdrop-filter: blur(10px);
-  height: 200px;
+  height: 180px;
 }
 
 .poster-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 16px;
 }
 
 .stat-item {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  padding: 16px 12px;
+  border-radius: 10px;
+  padding: 12px 10px;
   text-align: center;
-  backdrop-filter: blur(10px);
 
   .stat-value {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
     margin-bottom: 4px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-
-    &.highlight {
-      color: #ffd700;
-    }
   }
 
   .stat-label {
-    font-size: 12px;
+    font-size: 11px;
     opacity: 0.85;
   }
 }
@@ -1387,38 +2147,32 @@ watch(
 .poster-details {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 12px;
-  padding: 16px;
+  padding: 14px;
   margin-bottom: 16px;
-  backdrop-filter: blur(10px);
 
   .details-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    margin-bottom: 10px;
   }
 
   .details-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 
   .detail-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: 100%;
-    font-size: 13px;
-    padding: 8px 12px;
+    font-size: 12px;
+    padding: 6px 10px;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    box-sizing: border-box;
+    border-radius: 6px;
 
     .detail-month {
-      flex: 0 0 70px;
+      flex: 0 0 60px;
       opacity: 0.9;
     }
 
@@ -1428,7 +2182,7 @@ watch(
     }
 
     .detail-status {
-      flex: 0 0 100px;
+      flex: 0 0 80px;
       text-align: right;
 
       &.success {
@@ -1440,13 +2194,6 @@ watch(
       }
     }
   }
-
-  .details-empty {
-    text-align: center;
-    padding: 20px;
-    opacity: 0.7;
-    font-size: 13px;
-  }
 }
 
 .poster-footer {
@@ -1454,212 +2201,27 @@ watch(
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
 
-  .footer-date {
-    font-size: 12px;
+  .footer-tip {
+    font-size: 11px;
     opacity: 0.7;
   }
 }
 
-.poster-actions {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-top: 20px;
+// ==================== 通用样式 ====================
+.danger {
+  color: #f56c6c;
 }
 
-// 响应式
-@media (max-width: 992px) {
-  .card-header .header-btns {
-    flex-wrap: wrap;
-  }
+.success {
+  color: #67c23a;
 }
 
-@media (max-width: 768px) {
-  .main-page {
-    padding: 15px;
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
   }
-
-  .header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-
-    h1 {
-      font-size: 18px;
-    }
-  }
-
-  .header-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .summary-cards {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-
-  .summary-card {
-    :deep(.el-card__body) {
-      padding: 12px;
-    }
-
-    .summary-label {
-      font-size: 12px;
-    }
-
-    .summary-value {
-      font-size: 18px;
-    }
-  }
-
-  .data-card {
-    :deep(.el-card__header) {
-      padding: 12px 15px;
-    }
-
-    :deep(.el-card__body) {
-      padding: 0;
-    }
-  }
-
-  .card-header {
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-
-    span {
-      font-size: 14px;
-    }
-  }
-
-  // 表格横向滚动
-  :deep(.el-table) {
-    font-size: 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .main-page {
-    padding: 10px;
-  }
-
-  .header {
-    h1 {
-      font-size: 16px;
-    }
-  }
-
-  .header-actions {
-    gap: 6px;
-
-    .el-button {
-      padding: 8px;
-    }
-
-    .el-button--text {
-      font-size: 12px;
-      padding: 8px 4px;
-    }
-  }
-
-  .summary-cards {
-    gap: 8px;
-  }
-
-  .summary-card {
-    :deep(.el-card__body) {
-      padding: 10px 8px;
-    }
-
-    .summary-label {
-      font-size: 11px;
-      margin-bottom: 4px;
-    }
-
-    .summary-value {
-      font-size: 16px;
-    }
-  }
-
-  .sync-status {
-    font-size: 11px;
-    margin-bottom: 10px;
-  }
-
-  .login-card {
-    padding: 25px 20px;
-
-    h1 {
-      font-size: 20px;
-      margin-bottom: 20px;
-    }
-  }
-
-  .login-tips {
-    font-size: 12px;
-    padding: 12px;
-  }
-
-  // 海报弹窗适配
-  .poster-dialog {
-    :deep(.el-dialog) {
-      width: 95% !important;
-      margin: 10px auto;
-    }
-  }
-
-  .poster-wrapper {
-    padding: 10px;
-  }
-
-  .poster {
-    width: 100%;
-    max-width: 340px;
-    padding: 16px;
-  }
-
-  .poster-header .poster-title {
-    font-size: 18px;
-    letter-spacing: 1px;
-  }
-
-  .poster-chart {
-    height: 160px;
-    padding: 8px;
-  }
-
-  .poster-stats {
-    gap: 8px;
-  }
-
-  .stat-item {
-    padding: 12px 8px;
-
-    .stat-value {
-      font-size: 16px;
-    }
-
-    .stat-label {
-      font-size: 11px;
-    }
-  }
-
-  .poster-details {
-    padding: 12px;
-
-    .detail-row {
-      padding: 6px 8px;
-      font-size: 12px;
-
-      .detail-month {
-        flex: 0 0 60px;
-      }
-
-      .detail-status {
-        flex: 0 0 80px;
-      }
-    }
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>
