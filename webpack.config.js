@@ -97,9 +97,7 @@ export default {
   mode: isProduction ? 'production' : 'development',
   // 性能提示配置
   performance: {
-    // hints: process.env.NODE_ENV === 'production' ? 'warning' : false,
-    maxEntrypointSize: 600000, // 入口点最大体积 600KB
-    maxAssetSize: 512000, // 单个资源最大体积 500KB
+    hints: false, // 关闭体积警告（Element Plus + ECharts 等库体积较大属于正常情况）
   },
   // 忽略自动生成的类型/临时文件，避免触发 rebuild 循环
   watchOptions: {
@@ -135,19 +133,38 @@ export default {
         vue: {
           test: /[\\/]node_modules[\\/](vue|@vue)[\\/]/,
           name: 'vue-vendor',
-          priority: 20,
+          priority: 30,
         },
         // 提取 Element Plus
         elementPlus: {
           test: /[\\/]node_modules[\\/]element-plus[\\/]/,
           name: 'element-plus',
-          priority: 15,
+          priority: 25,
+        },
+        // 提取 ECharts（较大的库单独分离）
+        echarts: {
+          test: /[\\/]node_modules[\\/](echarts|zrender)[\\/]/,
+          name: 'echarts',
+          priority: 20,
+        },
+        // 提取 html2canvas
+        html2canvas: {
+          test: /[\\/]node_modules[\\/]html2canvas[\\/]/,
+          name: 'html2canvas',
+          priority: 20,
+        },
+        // 提取 QRCode 相关库
+        qrcode: {
+          test: /[\\/]node_modules[\\/](qrcode|qr-code-styling)[\\/]/,
+          name: 'qrcode-lib',
+          priority: 20,
         },
         // 提取其他第三方库
         vendors: {
           test: /[\\/]node_modules[\\/]/,
           name: 'vendors',
           priority: 10,
+          maxSize: 300000, // 超过 300KB 自动拆分
         },
         // 提取公共代码（至少被2个页面引用）
         common: {

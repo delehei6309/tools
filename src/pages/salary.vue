@@ -589,7 +589,22 @@ import {
   Loading,
 } from '@element-plus/icons-vue';
 import Big from 'big.js';
-import * as echarts from 'echarts';
+// ECharts 按需引入（减少约 800KB）
+import * as echarts from 'echarts/core';
+import { PieChart } from 'echarts/charts';
+import type { PieSeriesOption } from 'echarts/charts';
+import { LegendComponent, TooltipComponent } from 'echarts/components';
+import type { LegendComponentOption, TooltipComponentOption } from 'echarts/components';
+import { LabelLayout } from 'echarts/features';
+import { CanvasRenderer } from 'echarts/renderers';
+import type { ComposeOption } from 'echarts/core';
+
+// 组合类型
+type ECOption = ComposeOption<PieSeriesOption | LegendComponentOption | TooltipComponentOption>;
+
+// 注册 ECharts 组件
+echarts.use([PieChart, LegendComponent, TooltipComponent, LabelLayout, CanvasRenderer]);
+
 import html2canvas from 'html2canvas';
 
 // ==================== 类型定义 ====================
@@ -654,7 +669,7 @@ const paymentsList = ref<Payment[]>([]);
 const posterVisible = ref(false);
 const posterRef = ref<HTMLElement | null>(null);
 const posterChartRef = ref<HTMLElement | null>(null);
-let posterChartInstance: echarts.ECharts | null = null;
+let posterChartInstance: ReturnType<typeof echarts.init> | null = null;
 
 // 判断是否为移动端
 const windowWidth = ref(window.innerWidth);
@@ -832,7 +847,7 @@ function initPosterChart() {
   }
   posterChartInstance = echarts.init(posterChartRef.value);
 
-  const option: echarts.EChartsOption = {
+  const option: ECOption = {
     tooltip: { show: false },
     legend: {
       orient: 'horizontal',
