@@ -7,18 +7,18 @@
         </div>
       </template>
 
-      <el-form :model="form" label-width="120px">
+      <el-form :model="form" label-width="120px" :rules="rules">
         <!-- 输入方式切换 -->
         <el-form-item label="输入方式">
           <el-radio-group v-model="form.inputType">
-            <el-radio-button label="link">链接解析</el-radio-button>
             <el-radio-button label="manual">手动输入</el-radio-button>
+            <el-radio-button label="link">链接解析</el-radio-button>
           </el-radio-group>
         </el-form-item>
 
         <!-- 链接输入模式 -->
         <template v-if="form.inputType === 'link'">
-          <el-form-item label="商品链接">
+          <el-form-item label="商品链接" prop="productLink">
             <el-input
               v-model="form.productLink"
               placeholder="请粘贴商品详情页链接 (京东/淘宝/天猫)"
@@ -80,9 +80,6 @@
         </div>
       </div>
     </el-card>
-    <el-input v-model="smsCode" placeholder="请输入短信验证码" />
-    <el-button @click="loginJD">登录JD测试</el-button>
-    <el-button @click="submitSmsCode">提交验证码</el-button>
   </div>
 </template>
 
@@ -102,6 +99,16 @@ const form = reactive({
   tone: 'normal', // normal, humorous, serious, literary
 });
 
+const rules = {
+  productLink: [
+    {
+      required: form.inputType === 'link',
+      message: '请输入商品链接',
+      trigger: 'blur',
+    },
+  ],
+};
+
 const generateReview = async () => {
   // 校验
   if (form.inputType === 'link' && !form.productLink) {
@@ -118,21 +125,24 @@ const generateReview = async () => {
   let productInfo = {};
 
   if (form.inputType === 'link') {
-    const resp = await fetch('http://192.168.31.189/:3000/scrape', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: form.productLink,
-      }),
-    })
-      .then((res) => res.json())
-      .catch(() => null);
-    console.log('Scrape response:', resp);
+    try {
+      const resp = await fetch('http://192.168.31.189:3000/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: form.productLink,
+        }),
+      });
+      const data = await resp.json();
+      console.log('Scrape response:', data);
 
-    if (resp && resp.data) {
-      productInfo = resp.data;
+      if (data && data.data) {
+        productInfo = data.data;
+      }
+    } catch (error) {
+      console.error('Error during scraping:', error);
     }
   } else {
     productInfo = {
@@ -140,9 +150,9 @@ const generateReview = async () => {
       features: form.features,
     };
   }
-
+  //  debugger
   // 流式数据  http://localhost:3000/review
-  const reviewResp = await fetch('http://192.168.31.189/:3000/review', {
+  const reviewResp = await fetch('http://192.168.31.189:3000/review', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -209,53 +219,6 @@ const copyResult = () => {
     .catch(() => {
       ElMessage.error('复制失败');
     });
-};
-const smsCode = ref('');
-const sessionId = ref('');
-const loginJD = async () => {
-  try {
-    const resp = await fetch('http://localhost:3000/send-code', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    const data = await resp.json();
-    console.log('Login response:', data);
-    if (data.ok) {
-      ElMessage.success(data.msg || 'JD登录成功');
-      if (data.sessionId) {
-        sessionId.value = data.sessionId;
-      }
-    } else {
-      ElMessage.error(data.error || 'JD登录失败');
-    }
-  } catch (e) {
-    ElMessage.error('JD登录请求失败');
-  }
-};
-const submitSmsCode = async () => {
-  if (!sessionId.value) {
-    ElMessage.warning('请先点击登录获取会话ID');
-    return;
-  }
-  try {
-    const resp = await fetch('http://192.168.31.189/:3000/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ code: smsCode.value, sessionId: sessionId.value }),
-    });
-    const data = await resp.json();
-    console.log('Submit SMS response:', data);
-    if (data.ok) {
-      ElMessage.success(data.msg || '验证码提交成功');
-    } else {
-      ElMessage.error(data.error || '验证码提交失败');
-    }
-  } catch (e) {
-    ElMessage.error('验证码提交请求失败');
-  }
 };
 </script>
 
