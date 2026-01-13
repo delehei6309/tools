@@ -33,6 +33,16 @@
               <el-button type="primary" @click="goToSmartReview">立即使用</el-button>
             </div>
           </el-card>
+
+          <el-card shadow="hover" class="tool-card">
+            <div class="tool-item">
+              <div>
+                <h4>💰 薪资扣税计算器</h4>
+                <p>个人所得税累计预扣法计算，支持专项附加扣除和月度自定义</p>
+              </div>
+              <el-button type="primary" @click="goToSalaryTax">立即使用</el-button>
+            </div>
+          </el-card>
         </el-space>
 
         <el-divider />
@@ -54,6 +64,10 @@ const goToQRCode = () => {
 
 const goToSmartReview = () => {
   window.location.href = './smart-review.html';
+};
+
+const goToSalaryTax = () => {
+  window.location.href = './salary-tax.html';
 };
 </script>
 
